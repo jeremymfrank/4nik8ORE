@@ -8,7 +8,7 @@ const RESOURCES={
 const MARKETS={'10000043':'Amarr / Domain','10000002':'Jita / The Forge','10000030':'Rens / Heimatar','10000042':'Hek / Metropolis','10000032':'Dodixie / Sinq Laison','10000038':'The Bleak Lands','10000068':'Verge Vendor'};
 const CACHE_TTL=300000; const memCache=new Map();
 const state={resource:'ore',system:null,region:null,hub:10000043,results:[],selected:null,lastRun:0,inProgress:false,runId:0};
-const ua='4NIK8-Industrial-Command-Preview/0.2.0';
+const ua='4NIK8-Industrial-Command-Preview/0.3.0';
 const esi='https://esi.evetech.net/latest';
 function url(path){return esi+path+(path.includes('?')?'&':'?')+'datasource=tranquility&compatibility_date=2025-09-30&user_agent='+encodeURIComponent(ua);}
 function setStatus(status,detail){$('connectionBadge').className='conn-status '+status;$('connectionBadge').querySelector('span:last-child').textContent=detail;}
@@ -145,7 +145,7 @@ async function routeToBuyer(stationId){
  try{
   if(stationId>=1000000000000)throw Error('This appears to be a player structure; public station details may not be available.');
   const station=await request('/universe/stations/'+stationId+'/',{},86400000);
-  const route=await request('/route/'+state.system.id+'/'+station.system_id+'/',{method:'POST',body:JSON.stringify({preference:'Safer',security_penalty:50})},86400000);
+  const route=await request('/route/'+state.system.id+'/'+station.system_id+'/?flag=secure',{},86400000);
   if(!Array.isArray(route))throw Error('Invalid route response.');
   label.innerHTML=`<strong>${L.escape(station.name)}</strong> · ${Math.max(0,route.length-1)} jumps by safer route. Verify risk in-game before hauling; wormhole connections are not included automatically.`;
  }catch(e){label.textContent='Route unavailable: '+e.message;}finally{button.disabled=false;}
@@ -156,7 +156,7 @@ function radioInit(){
  const maxChannels=40;
  let channels=[],editId=null,selectedChannelId=null;
  let source='none',audioIndex=-1,ytPlayer=null,ytReady=false,ytPlaying=false;
- let ytApiPromise=null,ytPlayerPromise=null,trackTitle='';
+ let ytApiPromise=null,ytPlayerPromise=null,trackTitle='',tuneSequence=0;
  const audioTracks=[];
  const volumeInput=$('radioVolume');
  try{
@@ -168,7 +168,7 @@ function radioInit(){
  }catch(_){channels=[];}
  try{const v=+localStorage.getItem(VOLUME_KEY);if(Number.isFinite(v)&&v>=0&&v<=100)volumeInput.value=v;}catch(_){}
  audio.volume=+volumeInput.value/100;$('volumeValue').textContent=volumeInput.value;
- function persist(){try{localStorage.setItem(STORAGE,JSON.stringify(channels));return true;}catch(e){setChannelMessage('Presets could not be saved in browser storage: '+e.message,true);return false;}}
+ function persist(){try{localStorage.setItem(STORAGE,JSON.stringify(channels));settingsManager.schedule();return true;}catch(e){setChannelMessage('Presets could not be saved in browser storage: '+e.message,true);return false;}}
  function setChannelMessage(msg,isError=false){$('channelMessage').textContent=msg;$('channelMessage').classList.toggle('error',isError);}
  function channel(){return channels.find(c=>c.id===selectedChannelId)||null;}
  function channelNumber(id){const i=channels.findIndex(c=>c.id===id);return String(i+1).padStart(2,'0');}
@@ -196,6 +196,7 @@ function radioInit(){
   }));
  }
  function cancelEdit(){editId=null;$('channelForm').reset();$('saveChannel').textContent='+ SAVE CB CHANNEL';$('cancelChannelEdit').hidden=true;}
+ $('newChannel').addEventListener('click',()=>{cancelEdit();setChannelMessage('New channel mode. Paste another shared playlist and save it.');$('channelName').focus();});
  $('cancelChannelEdit').addEventListener('click',()=>{cancelEdit();setChannelMessage('Ready to save another playlist.');});
  $('channelForm').addEventListener('submit',e=>{
   e.preventDefault();
@@ -203,6 +204,8 @@ function radioInit(){
   if(!name){setChannelMessage('Give this channel a name.',true);return;}
   let parsed;try{parsed=L.parseYouTubePlaylistUrl(input);}catch(err){setChannelMessage(err.message,true);return;}
   if(!editId&&channels.length>=maxChannels){setChannelMessage('Maximum '+maxChannels+' saved channels reached.',true);return;}
+  const duplicate=channels.find(c=>c.playlistId===parsed.playlistId&&c.id!==editId);
+  if(duplicate){setChannelMessage('That playlist is already saved as CH '+channelNumber(duplicate.id)+' · '+duplicate.name+'. Use TUNE or EDIT.',true);return;}
   const saved={id:editId||String(Date.now())+'-'+Math.random().toString(36).slice(2,10),name:name.slice(0,48),url:parsed.canonicalUrl,playlistId:parsed.playlistId};
   if(editId){const index=channels.findIndex(c=>c.id===editId);if(index>=0)channels[index]=saved;else channels.push(saved);}else channels.push(saved);
   const wasActive=selectedChannelId===saved.id;
@@ -218,9 +221,16 @@ function radioInit(){
   else $('nowPlaying').textContent='NO SIGNAL · SELECT AUDIO';
   $('playPause').textContent=source==='youtube'?(ytPlaying?'❚❚':'▶'):(source==='audio'&&!audio.paused?'❚❚':'▶');
  }
+ function resetYouTubePlayer(){
+  ++tuneSequence;
+  if(ytPlayer&&typeof ytPlayer.destroy==='function'){try{ytPlayer.destroy();}catch(_){}}
+  else if(ytPlayer&&typeof ytPlayer.stopVideo==='function'){try{ytPlayer.stopVideo();}catch(_){}}
+  ytPlayer=null;ytReady=false;ytPlaying=false;ytPlayerPromise=null;
+  $('youtubePlayerMount').replaceChildren();
+ }
  function stopYouTube(){
-  if(ytPlayer&&ytReady&&typeof ytPlayer.stopVideo==='function'){try{ytPlayer.stopVideo();}catch(_){}}
-  selectedChannelId=null;ytPlaying=false;trackTitle='';$('youtubeShell').hidden=true;
+  resetYouTubePlayer();
+  selectedChannelId=null;trackTitle='';$('youtubeShell').hidden=true;
   if(source==='youtube')source='none';
   renderChannels();nowPlaying();
  }
@@ -237,49 +247,66 @@ function radioInit(){
   }).catch(e=>{ytApiPromise=null;throw e;});
   return ytApiPromise;
  }
- function ensurePlayer(){
-  if(ytPlayerPromise)return ytPlayerPromise;
-  ytPlayerPromise=ensureYouTubeApi().then(YT=>new Promise((resolve,reject)=>{
-   // Keep the official video player visible; audio-only hidden YouTube embedding is not supported.
-   const timer=setTimeout(()=>reject(Error('YouTube player did not initialize.')),18000);
-   ytPlayer=new YT.Player('youtubePlayerMount',{
-    width:'100%',height:'100%',playerVars:{playsinline:1,controls:1,rel:0,origin:window.location.origin},
-    events:{
-     onReady(event){clearTimeout(timer);ytReady=true;event.target.setVolume(+volumeInput.value);resolve(event.target);},
-     onStateChange(event){
-      ytPlaying=event.data===YT.PlayerState.PLAYING;
-      if(source==='youtube'){
-       try{trackTitle=event.target.getVideoData()?.title||'';}catch(_){trackTitle='';}
-       if(event.data===YT.PlayerState.PLAYING)status('Broadcasting from YouTube · playlist supplied by user');
-       else if(event.data===YT.PlayerState.PAUSED)status('YouTube playback paused');
-       else if(event.data===YT.PlayerState.BUFFERING)status('Tuning YouTube stream…');
-       else if(event.data===YT.PlayerState.ENDED)status('Playlist ended.');
-       nowPlaying();
-      }
-     },
-     onError(event){if(source==='youtube')status('YouTube error '+event.data+': playlist may be private, restricted, or not embeddable. Try opening it on YouTube.');}
-    }
-   });
-  })).catch(e=>{ytPlayerPromise=null;throw e;});
-  return ytPlayerPromise;
+ // Each saved CB station gets a fresh YouTube player. Reusing the previous iframe
+ // could leave an old playlist/video queued when quickly changing channels.
+ function errorDescription(code){
+  const descriptions={2:'Invalid YouTube player parameter or playlist identifier (not a playlist visibility error).',5:'YouTube HTML5 player error.',100:'A video was removed, unavailable, or private.',101:'A video owner disabled embedding.',150:'A video owner disabled embedding.',153:'YouTube rejected the embedded client identity / HTTP referrer.'};
+  return descriptions[code]||'YouTube could not play this content.';
  }
  async function tuneChannel(id){
   const requested=channels.find(c=>c.id===id);if(!requested)return;
-  // A saved playlist is not necessarily playable: YouTube decides embed eligibility.
   if(location.protocol==='file:'){
-   setChannelMessage('To play YouTube channels, launch the app with START_COMMAND.cmd (localhost required for YouTube embeds).',true);
-   return;
+   setChannelMessage('Launch with START_COMMAND.cmd to use the localhost YouTube player.',true);return;
   }
-  audio.pause();source='youtube';selectedChannelId=id;trackTitle='';ytPlaying=false;
+  audio.pause();
+  resetYouTubePlayer();const generation=tuneSequence;
+  source='youtube';selectedChannelId=id;trackTitle='';
+  try{localStorage.setItem('4nik8.cb.lastChannel.v1',id);}catch(_){}
+  settingsManager.schedule();
   $('radioContent').hidden=false;$('radioCollapse').textContent='▾';$('radioCollapse').setAttribute('aria-expanded','true');
   $('youtubeShell').hidden=false;renderChannels();nowPlaying();status('Tuning CH '+channelNumber(id)+'…');
-  try{
-   const player=await ensurePlayer();
-   if(source!=='youtube'||selectedChannelId!==id)return;
-   player.loadPlaylist({list:requested.playlistId,listType:'playlist',index:0});
-   player.setVolume(+volumeInput.value);
-   status('Channel loaded. If playback does not start, click Play inside the YouTube player.');
-  }catch(err){status('Cannot tune YouTube: '+err.message);}
+  $('youtubeExternal').href='https://www.youtube.com/playlist?list='+encodeURIComponent(requested.playlistId);
+  try {
+   const YT=await ensureYouTubeApi();
+   if(generation!==tuneSequence)return;
+   ytPlayerPromise=new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(Error('YouTube player did not initialize.')),18000);
+    ytPlayer=new YT.Player('youtubePlayerMount',{
+     width:'100%',height:'100%',
+     playerVars:{playsinline:1,controls:1,rel:0,origin:window.location.origin},
+     events:{
+      onReady(event){
+       clearTimeout(timer);
+       if(generation!==tuneSequence)return;
+       ytReady=true;
+       event.target.setVolume(+volumeInput.value);
+       // Official playlist API accepts the bare playlist ID from the share URL.
+       event.target.loadPlaylist({list:requested.playlistId,listType:'playlist',index:0});
+       status('Playlist requested. If autoplay is blocked, use Play on the YouTube player.');
+       resolve(event.target);
+      },
+      onStateChange(event){
+       if(generation!==tuneSequence)return;
+       ytPlaying=event.data===YT.PlayerState.PLAYING;
+       if(source==='youtube'){
+        try{trackTitle=event.target.getVideoData()?.title||'';}catch(_){trackTitle='';}
+        if(event.data===YT.PlayerState.PLAYING)status('Broadcasting CH '+channelNumber(id)+' from YouTube');
+        else if(event.data===YT.PlayerState.PAUSED)status('YouTube playback paused');
+        else if(event.data===YT.PlayerState.BUFFERING)status('Tuning YouTube stream…');
+        else if(event.data===YT.PlayerState.ENDED)status('Playlist ended.');
+        nowPlaying();
+       }
+      },
+      onError(event){
+       if(generation!==tuneSequence || source!=='youtube')return;
+       status('YouTube error '+event.data+': '+errorDescription(event.data)+' Use OPEN ON YOUTUBE if needed.');
+       setChannelMessage('CH '+channelNumber(id)+' did not embed. Playlist ID: '+requested.playlistId+'. This does not mean your unlisted sharing is wrong.',true);
+      }
+     }
+    });
+   });
+   await ytPlayerPromise;
+  } catch(err){if(generation===tuneSequence){ytPlayerPromise=null;status('Cannot tune YouTube: '+err.message);}}
  }
  function renderLocalPlaylist(){
   $('playlist').innerHTML=audioTracks.map((t,i)=>`<button class="${source==='audio'&&i===audioIndex?'active':''}" data-index="${i}">${L.escape(t.name)}</button>`).join('');
@@ -322,6 +349,7 @@ function radioInit(){
   const v=+e.target.value;audio.volume=v/100;$('volumeValue').textContent=v;
   if(ytPlayer&&ytReady)ytPlayer.setVolume(v);
   try{localStorage.setItem(VOLUME_KEY,String(v));}catch(_){}
+  settingsManager.schedule();
  });
  $('radioCollapse').addEventListener('click',()=>{
   const content=$('radioContent'),opening=content.hidden;
@@ -335,23 +363,108 @@ function radioInit(){
 }
 Array.from(document.querySelectorAll('[data-resource]')).forEach(b=>b.addEventListener('click',()=>{
  state.resource=b.dataset.resource;
+ settingsManager.schedule();
  document.querySelectorAll('[data-resource]').forEach(x=>{const active=x===b;x.classList.toggle('active',active);x.setAttribute('aria-pressed',String(active));});
 }));
-$('scanForm').addEventListener('submit',e=>{e.preventDefault();runScan(false);});$('refreshButton').addEventListener('click',()=>runScan(true));
+$('scanForm').addEventListener('submit',e=>{e.preventDefault();settingsManager.schedule();runScan(false);});
+['systemInput','hubSelect','cargoVolume'].forEach(id=>$(id).addEventListener('change',()=>settingsManager.schedule()));$('refreshButton').addEventListener('click',()=>runScan(true));
+
+// Settings are stored in %LOCALAPPDATA% via the loopback host, outside the
+// extracted release folder. Browser storage is retained for v0.2 migration.
+const settingsManager=(()=>{
+ const keys={channels:'4nik8.cb.channels.v1',volume:'4nik8.cb.volume.v1',livery:'4nik8.dashboard.livery.v1',last:'4nik8.cb.lastChannel.v1'};
+ let timer=null,queue=Promise.resolve(),started=false;
+ const readLocal=(key,fallback)=>{try{const v=localStorage.getItem(key);return v===null?fallback:v;}catch(_){return fallback;}};
+ function capture(){
+  let channels=[];try{channels=JSON.parse(readLocal(keys.channels,'[]'));}catch(_){}
+  if(!Array.isArray(channels))channels=[];
+  const n=Number(readLocal(keys.volume,'55'));
+  return {schemaVersion:1,livery:readLocal(keys.livery,'neon'),
+   radio:{volume:Number.isFinite(n)?Math.max(0,Math.min(100,n)):55,channels:channels.slice(0,40),selectedChannelId:readLocal(keys.last,'')},
+   scanner:{system:$('systemInput').value.trim(),hub:$('hubSelect').value,resource:state.resource,cargo:Math.max(1,Math.trunc(+$('cargoVolume').value||31625))}};
+ }
+ function apply(data){
+  if(!data||data.schemaVersion!==1)return;
+  try{
+   if(['neon','steel','amber','oxide'].includes(data.livery))localStorage.setItem(keys.livery,data.livery);
+   if(Array.isArray(data.radio?.channels))localStorage.setItem(keys.channels,JSON.stringify(data.radio.channels));
+   if(Number.isFinite(+data.radio?.volume))localStorage.setItem(keys.volume,String(data.radio.volume));
+   if(typeof data.radio?.selectedChannelId==='string')localStorage.setItem(keys.last,data.radio.selectedChannelId);
+  }catch(_){}
+  const scan=data.scanner||{};
+  if(typeof scan.system==='string'&&scan.system)$('systemInput').value=scan.system;
+  if(typeof scan.hub==='string'&&[...$('hubSelect').options].some(x=>x.value===scan.hub))$('hubSelect').value=scan.hub;
+  if(Number.isFinite(+scan.cargo)&&+scan.cargo>0)$('cargoVolume').value=+scan.cargo;
+  if(['ore','ice'].includes(scan.resource)){
+   state.resource=scan.resource;
+   document.querySelectorAll('[data-resource]').forEach(b=>{const yes=b.dataset.resource===scan.resource;b.classList.toggle('active',yes);b.setAttribute('aria-pressed',String(yes));});
+  }
+ }
+ function notify(msg){const el=$('settingsStatus');if(el)el.textContent=msg;}
+ function save(){
+  // Capture at execution time to avoid a queued stale write reverting newer settings.
+  queue=queue.catch(()=>{}).then(async()=>{
+   try{const res=await fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(capture())});
+    if(!res.ok)throw Error('HTTP '+res.status);
+    notify('SETTINGS SAVED TO WINDOWS');
+   }catch(e){notify('LOCAL BACKUP ONLY · '+e.message);}
+  });return queue;
+ }
+ function schedule(){if(!started)return;clearTimeout(timer);timer=setTimeout(save,450);}
+ async function load(){
+  const browser=capture();
+  try{
+   const ctrl=new AbortController();const t=setTimeout(()=>ctrl.abort(),2200);
+   let response;try{response=await fetch('/api/settings',{signal:ctrl.signal,cache:'no-store'});}finally{clearTimeout(t);}
+   if(!response.ok)throw Error('HTTP '+response.status);
+   const disk=await response.json();
+   if(disk&&disk.schemaVersion===1){
+    // Restore durable snapshot; merge any presets that were created in old v0.2
+    // browser storage but not yet migrated to AppData.
+    const ids=new Set((disk.radio?.channels||[]).map(c=>c.playlistId));
+    const additions=(browser.radio.channels||[]).filter(c=>c?.playlistId&&!ids.has(c.playlistId));
+    const merged=structuredClone(disk);
+    if(additions.length)merged.radio.channels=[...merged.radio.channels,...additions].slice(0,40);
+    apply(merged);notify('WINDOWS SETTINGS RESTORED');
+   }else {apply(browser);notify('BROWSER CHANNELS MIGRATED TO WINDOWS');}
+  }catch(_){notify('BROWSER SETTINGS ONLY · WINDOWS HOST UNAVAILABLE');}
+  started=true;await save();
+ }
+ function download(){
+  const json=JSON.stringify(capture(),null,2), blob=new Blob([json],{type:'application/json'}),u=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=u;a.download='4nik8-industrial-command-settings.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1200);
+ }
+ async function importFile(file){
+  const d=JSON.parse(await file.text());
+  if(d?.schemaVersion!==1||!Array.isArray(d.radio?.channels)||d.radio.channels.length>40)throw Error('Not a compatible 4NIK8 settings file.');
+  // Never execute imported content; validate IDs and URLs before storing.
+  for(const c of d.radio.channels){if(typeof c.name!=='string'||c.name.length>48||!c.name.trim())throw Error('Invalid channel name'); const p=L.parseYouTubePlaylistUrl(c.url);c.playlistId=p.playlistId;c.url=p.canonicalUrl;if(!c.id||String(c.id).length>90)throw Error('Invalid preset ID');}
+  if(!['neon','steel','amber','oxide'].includes(d.livery))throw Error('Unrecognized livery');
+  if(!(Number.isFinite(+d.radio.volume)&&+d.radio.volume>=0&&+d.radio.volume<=100))throw Error('Invalid volume');
+  apply(d);await save();location.reload();
+ }
+ function wire(){
+  $('exportSettings').addEventListener('click',download);
+  $('importSettings').addEventListener('click',()=>$('importSettingsFile').click());
+  $('importSettingsFile').addEventListener('change',async(e)=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;try{await importFile(f);}catch(err){notify('IMPORT FAILED · '+err.message);}});
+ }
+ wire();return {load,schedule,save};
+})();
+
 // Save the dashboard paint job independently from music presets and market cache.
 function liveryInit(){
- const key='4nik8.dashboard.livery.v1', allowed=new Set(['amber','steel','oxide']), picker=$('liverySelect');
- let chosen='steel';
+ const key='4nik8.dashboard.livery.v1', allowed=new Set(['neon','amber','steel','oxide']), picker=$('liverySelect');
+ let chosen='neon';
  try { const stored=localStorage.getItem(key);if(allowed.has(stored))chosen=stored; }catch(_){}
  function apply(value){
-  const theme=allowed.has(value)?value:'steel';
+  const theme=allowed.has(value)?value:'neon';
   document.documentElement.dataset.livery=theme;
   picker.value=theme;
   try{localStorage.setItem(key,theme);}catch(_){}
+  settingsManager.schedule();
  }
  picker.addEventListener('change',()=>apply(picker.value));
  apply(chosen);
 }
-liveryInit();
-radioInit();
+settingsManager.load().finally(()=>{liveryInit();radioInit();});
 })();

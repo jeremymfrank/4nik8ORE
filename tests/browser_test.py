@@ -1,85 +1,122 @@
-"""Offline browser smoke test. Does not require external network or localhost navigation.
-Network navigation is restricted in the build sandbox, so the app is injected as an inline page.
-Official YouTube playback itself is not tested: YT Player is mocked, not streamed.
+"""Offline Chromium integration tests: 2-channel switching, AppData migration mock,
+radio persistence across restart, livery, and error-2 messaging. External YouTube
+streaming and the Windows PowerShell HTTP server are NOT mocked as successful.
 """
 from playwright.sync_api import sync_playwright
 from pathlib import Path
-from html import escape
 root=Path(__file__).resolve().parents[1]
 html=(root/'index.html').read_text()
-css=(root/'styles.css').read_text()
-logic=(root/'logic.js').read_text()
-app=(root/'app.js').read_text()
-html=html.replace('<link rel="stylesheet" href="styles.css">','<style>'+css+'</style>')
-html=html.replace('<script src="logic.js"></script>', '<script>'+logic+'</script>')
-html=html.replace('<script src="app.js"></script>', '<script>'+app+'</script>')
-init="""
+html=html.replace('<link rel="stylesheet" href="styles.css">','<style>'+(root/'styles.css').read_text()+'</style>')
+html=html.replace('<script src="logic.js"></script>', '<script>'+(root/'logic.js').read_text()+'</script>')
+html=html.replace('<script src="app.js"></script>', '<script>'+(root/'app.js').read_text()+'</script>')
+# A fake YouTube iframe API deliberately triggers an error for channel 2 on first
+# attempt, so the real onError callback and player teardown paths are exercised.
+bootstrap=r"""
 window.__store=window.__store||{};
+window.__diskSettings=window.__diskSettings??null;
+window.__playerInstances=[];
 Object.defineProperty(window,'localStorage',{configurable:true,value:{
  getItem(k){return Object.hasOwn(window.__store,k)?window.__store[k]:null;},
  setItem(k,v){window.__store[k]=String(v);},
  removeItem(k){delete window.__store[k];}
 }});
+window.fetch=async(input,opts={})=>{
+ if(input==='/api/settings'){
+  if(opts.method==='PUT'){
+   window.__diskSettings=JSON.parse(opts.body);
+   return {ok:true,status:200,json:async()=>({ok:true})};
+  }
+  return {ok:true,status:200,json:async()=>window.__diskSettings};
+ }
+ throw Error('network disabled in integration test');
+};
 window.YT={PlayerState:{PLAYING:1,PAUSED:2,BUFFERING:3,ENDED:0},Player:class {
- constructor(el,opts){this.opts=opts;this.last=null;this.volume=0;window.fakeYT=this;setTimeout(()=>opts.events.onReady({target:this}),0);}
+ constructor(el,opts){this.opts=opts;this.last=null;this.volume=0;this.destroyed=false;
+  window.__playerInstances.push(this);window.fakeYT=this;
+  setTimeout(()=>opts.events.onReady({target:this}),0);
+ }
  setVolume(n){this.volume=n;}
  loadPlaylist(args){this.last=args;this.opts.events.onStateChange({target:this,data:1});}
  playVideo(){this.opts.events.onStateChange({target:this,data:1});}
  pauseVideo(){this.opts.events.onStateChange({target:this,data:2});}
- stopVideo(){this.opts.events.onStateChange({target:this,data:0});}
+ destroy(){this.destroyed=true;}
  previousVideo(){this.prev=true;}
  nextVideo(){this.next=true;}
  getVideoData(){return {title:'Test track'};}
+ emitError(n){this.opts.events.onError({target:this,data:n});}
 }};
 """
+ID1='PL1234567890abcdefghij'
+ID2='PLabcdefghij0987654321'
 with sync_playwright() as p:
- browser=p.chromium.launch(headless=True, executable_path='/usr/bin/chromium',args=['--no-sandbox'])
+ browser=p.chromium.launch(headless=True,executable_path='/usr/bin/chromium',args=['--no-sandbox'])
  page=browser.new_page(viewport={'width':1080,'height':1920},device_scale_factor=1)
- errors=[]
- page.on('pageerror',lambda e: errors.append(str(e)))
- page.evaluate(init)
+ errors=[];page.on('pageerror',lambda e: errors.append(str(e)))
+ page.evaluate(bootstrap)
  page.set_content(html,wait_until='domcontentloaded')
- assert page.locator('#liverySelect').input_value()=='steel'
+ page.wait_for_function("document.querySelector('#settingsStatus').textContent.includes('SAVED')")
+ assert page.locator('#liverySelect').input_value()=='neon'
  page.locator('#liverySelect').select_option('oxide')
  assert page.evaluate('document.documentElement.dataset.livery')=='oxide'
- assert page.evaluate('window.__store["4nik8.dashboard.livery.v1"]')=='oxide'
  page.locator('#channelName').fill("Scooter's Roadhouse")
- page.locator('#channelUrl').fill('https://music.youtube.com/playlist?list=PL1234567890abcdefghij&si=share')
+ page.locator('#channelUrl').fill('https://music.youtube.com/playlist?list='+ID1+'&si=share')
  page.locator('#saveChannel').click()
  assert page.locator('.channel-preset').count()==1
- assert 'Scooter' in page.locator('#channelList').inner_text()
- assert 'Saved' in page.locator('#channelMessage').inner_text()
- page.locator('[data-tune]').click()
- page.wait_for_function("window.fakeYT && window.fakeYT.last && window.fakeYT.last.list==='PL1234567890abcdefghij'")
+ page.locator('[data-tune]').first.click()
+ page.wait_for_function('window.fakeYT && window.fakeYT.last && window.fakeYT.last.list==="'+ID1+'"')
  assert page.locator('#youtubeShell').is_visible()
  assert 'Test track' in page.locator('#nowPlaying').inner_text()
- page.locator('#nextTrack').click()
- assert page.evaluate('window.fakeYT.next')
+ # New station must add rather than overwrite the existing one.
+ page.locator('#newChannel').click()
+ page.locator('#channelName').fill('Wormhole Country')
+ page.locator('#channelUrl').fill('https://music.youtube.com/playlist?list='+ID2+'&si=share')
+ page.locator('#saveChannel').click()
+ assert page.locator('.channel-preset').count()==2
+ page.locator('[data-tune]').nth(1).click()
+ page.wait_for_function('window.fakeYT && window.fakeYT.last && window.fakeYT.last.list==="'+ID2+'"')
+ assert page.evaluate('window.__playerInstances[0].destroyed')
+ assert page.evaluate('window.__playerInstances.length')==2
+ assert 'list='+ID2 in page.locator('#youtubeExternal').get_attribute('href')
+ page.evaluate('window.fakeYT.emitError(2)')
+ assert 'Invalid YouTube player parameter' in page.locator('#radioStatus').inner_text()
+ assert 'not mean your unlisted' in page.locator('#channelMessage').inner_text()
+ page.locator('[data-tune]').first.click()
+ page.wait_for_function('window.fakeYT && window.fakeYT.last && window.fakeYT.last.list==="'+ID1+'"')
+ assert page.evaluate('window.__playerInstances.length')==3
+ # Editing remains isolated; switching back/forth retains IDs.
+ page.locator('[data-edit]').nth(0).click()
+ page.locator('#channelName').fill('Scooter FM')
+ page.locator('#saveChannel').click()
+ assert page.locator('.channel-preset').count()==2
+ assert 'Scooter FM' in page.locator('#channelList').inner_text()
+ assert 'Wormhole Country' in page.locator('#channelList').inner_text()
  page.locator('#radioVolume').fill('45')
  assert page.evaluate('window.fakeYT.volume')==45
+ # Debounced persistence goes to a simulated AppData server, not just browser cache.
+ page.wait_for_function('window.__diskSettings && window.__diskSettings.radio.channels.length===2 && window.__diskSettings.radio.volume===45',timeout=5000)
+ assert page.evaluate('window.__diskSettings.livery')=='oxide'
  page.locator('#radioCollapse').click()
  assert page.locator('#youtubeShell').is_hidden()
  page.locator('#radioCollapse').click()
  assert page.locator('#youtubeShell').is_visible()
- page.locator('#channelForm').scroll_into_view_if_needed()
- page.screenshot(path=str(root/'dashboard-portrait-preview.png'),full_page=True)
- # Re-render with preserved storage to simulate restarting on the same local browser.
+ # Restart with local browser storage deliberately cleared: disk copy restores it.
+ page.evaluate('window.__store={}')
  page.set_content(html,wait_until='domcontentloaded')
- assert page.locator('.channel-preset').count()==1
+ page.wait_for_function("document.querySelectorAll('.channel-preset').length===2")
  assert page.locator('#radioVolume').input_value()=='45'
  assert page.locator('#liverySelect').input_value()=='oxide'
- page.locator('[data-edit]').click()
- page.locator('#channelName').fill('Scooter FM')
- page.locator('#saveChannel').click()
  assert 'Scooter FM' in page.locator('#channelList').inner_text()
+ # Export settings is a real, user-initiated download.
+ with page.expect_download() as item:
+  page.locator('#exportSettings').click()
+ assert item.value.suggested_filename=='4nik8-industrial-command-settings.json'
  page.once('dialog',lambda d:d.accept())
- page.locator('[data-delete]').click()
- assert page.locator('.channel-preset').count()==0
- page.locator('#channelName').fill('Hacker')
- page.locator('#channelUrl').fill('https://example.com/playlist?list=PL1234567890abcdefghij')
+ page.locator('[data-delete]').nth(1).click()
+ assert page.locator('.channel-preset').count()==1
+ page.locator('#channelName').fill('Wrong Domain')
+ page.locator('#channelUrl').fill('https://example.com/?list='+ID1)
  page.locator('#saveChannel').click()
  assert 'Only shared' in page.locator('#channelMessage').inner_text()
- assert page.locator('.channel-preset').count()==0
  assert not errors, errors
- print('PASS: saved playlist channels, mocked tune/playback controls, volume, pause on collapse, persistence, edit, delete, URL rejection, three liv eries.')
+ print('PASS: 2 saved playlists, player reset on switch, error-2 guidance, AppData mock persistence, migration, station edit/delete, settings export, 1080x1920, livery.')
  browser.close()

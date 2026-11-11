@@ -1,15 +1,15 @@
-# 4NIK8 ORE — Industrial Command (Preview v0.2.0)
+# 4NIK8 ORE — Industrial Command (Preview v0.3.0)
 
 **Local-only, single-user EVE Online mining-market prototype**, optimized for a **1080×1920 portrait side monitor**. Features the **CB ContraBand Radio** with saved YouTube Music / YouTube playlist channels.
 
 ## Start on Windows
 
 1. Extract the ZIP into a folder on your Windows PC.
-2. Double-click **`START_COMMAND.cmd`**. It launches a loopback-only Windows PowerShell HTTP server and opens the dashboard at `http://127.0.0.1:48148/`. Keep the launcher window open while using the app. No administrator rights required.
+2. Double-click **`START_COMMAND.cmd`**. Close the old launcher window before starting a new release. It launches a loopback-only Windows PowerShell HTTP server and opens the dashboard at `http://127.0.0.1:48148/`. Keep the launcher window open while using the app. No administrator rights required.
 3. Select an EVE system, public comparison market, resource type, and sample mining volume, then select **SCAN MARKETS**.
 4. Open **CB ContraBand Radio**. Paste a shared **YouTube Music** or **YouTube** playlist link, provide a channel name, and click **SAVE CB CHANNEL**.
-5. Click the saved channel's **TUNE** button to load the playlist using the **official visible YouTube IFrame Player API**. Use the player and dashboard transport/volume controls.
-6. Try **TRUCK LIVERY** in the upper right to switch among **Bandit Amber**, **4NIK8 Steel (draft)**, and **Salvage Oxide (draft)**.
+5. Use **NEW CHANNEL** before adding an additional preset. Click a saved channel's **TUNE** button to load the playlist using the **official visible YouTube IFrame Player API**. Use the player and dashboard transport/volume controls.
+6. Try **TRUCK LIVERY** in the upper right to switch among **4NIK8 Neon Freight**, **Bandit Amber**, **4NIK8 Steel**, and **Salvage Oxide**.
 
 There are **no EVE or Google account credentials required** for public market scanning or shared playlist links. The local dashboard does need internet access to load ESI, public YouTube playlists, and streamed radio.
 
@@ -17,7 +17,9 @@ There are **no EVE or Google account credentials required** for public market sc
 
 - Save up to 40 locally named playlist presets; rename, delete, tune, skip, pause, and adjust playback volume.
 - Accepts `https://music.youtube.com/playlist?list=...`, `https://www.youtube.com/playlist?list=...`, and YouTube Music shared `watch?...&list=...` or `/browse/VL...` URLs.
-- Saved channels, volume, and livery are stored in **browser `localStorage`** under the **localhost** origin. Use the same browser/profile and launcher for persistence. Clearing site data will erase saved presets; a future build will add backup/export.
+- Saved channels, volume, livery and scanner preferences are written to **`%LOCALAPPDATA%\4NIK8 ORE\Industrial Command\settings.json`**, independent of the ZIP extraction folder. Browser `localStorage` remains as a fallback; first v0.3 launch migrates presets from v0.2. **`settings.json.bak`** is maintained on updates. **EXPORT SETTINGS** downloads a JSON backup; **IMPORT SETTINGS** restores one. Install updates by extracting the next build and closing the old local server first.
+- **Second-channel bug fix:** Each TUNE initializes a fresh YouTube iframe. The player no longer carries old playlists into a newly selected station. Separate NEW CHANNEL and EDIT flows prevent accidental overwrites.
+- **Error 2** is reported as an invalid YouTube player request/identifier, not assumed to mean a private playlist. The official embed can still reject individual unlisted tracks; the **OPEN ON YOUTUBE** link plays the original shared playlist outside the dashboard.
 - Does not download, extract, or stream YouTube audio independently. YouTube embeds are shown in a visible player. **Collapsing the radio pauses YouTube playback**; the playlist remains available after expanding.
 - Some private, blocked, age-restricted, geographic, or otherwise unembeddable playlists cannot play. Autoplay may require clicking the video player. YouTube Music Premium-specific features and private-account library syncing are **not supported**.
 - Local music files and direct HTTPS audio streams are separate sources; local file selections must be chosen again after restart.
@@ -25,7 +27,7 @@ There are **no EVE or Google account credentials required** for public market sc
 
 ## Visual livery preview
 
-We could not reliably retrieve the exact colors of the provided RSI organization site in the build environment, so the palettes are **design experiments**, not authenticated copies of the organization's logo or banner. Keep **4NIK8 Steel** as the draft default, or switch back to **Bandit Amber** while comparing. A screenshot of the organization banner can be used to extract a precise palette in a later update.
+We could not reliably retrieve the exact colors of the provided RSI organization site in the build environment, so the palettes are **design experiments**, not authenticated copies of the organization's logo or banner. Keep **4NIK8 Steel** as the draft default, or switch back to **Bandit Amber** while comparing. The v0.3 **Neon Freight** livery uses the colorful user-provided 4NIK8 banner image as a subtle masthead overlay with green, cyan, magenta, violet and orange accents. Palette switching remains available.
 
 ## What the market preview actually does
 
@@ -33,7 +35,7 @@ We could not reliably retrieve the exact colors of the provided RSI organization
 - Resolves a curated subset of raw and compressed ore/ice item names and volumes.
 - Fetches **public regional buy orders** for the operating region and chosen hub region, respecting a short client-side cache.
 - Ranks gross price per mined cubic meter using **single-station order depth** and marks partially covered loads.
-- Lets you request a safer stargate route to public NPC buyer stations.
+- Lets you request a safer stargate route to public NPC buyer stations (changed route request to GET after the observed ESI 405; requires live verification).
 - Keeps all calculations, playlist presets, and user settings on the local PC/browser (no hosted application account).
 
 ## Important limitations
@@ -51,7 +53,7 @@ We could not reliably retrieve the exact colors of the provided RSI organization
 
 - `node --check app.js` and `node --check logic.js` (syntax).
 - `node tests/radio.test.js` validates playlist URL normalization and rejection of unsupported URLs.
-- `python tests/browser_test.py` runs an **offline, mocked YouTube player UI test** in Chromium/Playwright covering saves, tuning, transport controls, volume, collapse, persistence, edits, deletion, URL rejection, and livery changes. This does **not** verify actual playback on YouTube or live ESI connectivity.
+- `python tests/browser_test.py` runs an **offline, mocked YouTube player test** in Chromium/Playwright covering two-station switching, fresh player teardown, error-code handling, local server snapshot restoration, volume, editing, deletion, settings export and new livery. This does **not** verify actual playback on YouTube or the Windows PowerShell settings server.
 
 ## Official references
 

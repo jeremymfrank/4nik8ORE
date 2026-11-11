@@ -43,6 +43,8 @@ api.parseYouTubePlaylistUrl=function(raw){
   // YouTube Music may expose /browse/VL<playlist ID> links.
   if(!list && host==='music.youtube.com' && u.pathname.startsWith('/browse/VL'))
     list=u.pathname.slice('/browse/VL'.length);
+  // Share links sometimes use the VL prefix for a YouTube Music browse view, not the playlist ID.
+  if(list.startsWith('VL') && /^(?:PL|OLAK|UU|FL|RDCLAK)/.test(list.slice(2)))list=list.slice(2);
   if(!/^[A-Za-z0-9_-]{10,150}$/.test(list))
     throw Error('No usable playlist ID was found. Share the playlist itself, not a single song or private library view.');
   return {playlistId:list,canonicalUrl:'https://music.youtube.com/playlist?list='+encodeURIComponent(list)};

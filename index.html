@@ -12,7 +12,7 @@
     <header class="masthead">
       <div class="brand-icon" aria-hidden="true"><svg viewBox="0 0 60 60"><path d="M11 45L30 9l19 36-19-9-19 9Z"/><path d="M30 9v27M11 45l19-9 19 9"/></svg></div>
       <div class="brand-titles"><div class="eyebrow">4NIK8 ORE // FREIGHT INTELLIGENCE</div><h1>INDUSTRIAL COMMAND</h1><div class="subhead">FIND THE MONEY ROCKS <span class="separator">/</span> HAUL THE MONEY ROCKS</div></div>
-      <label class="livery-pick" for="liverySelect"><span>TRUCK LIVERY</span><select id="liverySelect" aria-label="Dashboard color scheme"><option value="amber">Bandit Amber</option><option value="steel">4NIK8 Steel (draft)</option><option value="oxide">Salvage Oxide (draft)</option></select></label>
+      <label class="livery-pick" for="liverySelect"><span>TRUCK LIVERY</span><select id="liverySelect" aria-label="Dashboard color scheme"><option value="neon">4NIK8 Neon Freight</option><option value="amber">Bandit Amber</option><option value="steel">4NIK8 Steel</option><option value="oxide">Salvage Oxide</option></select></label>
       <div class="conn-status" id="connectionBadge"><span class="led"></span><span>NOT CONNECTED</span></div>
     </header>
     <main>
@@ -49,26 +49,26 @@
           <div class="frequency"><div class="smallcaps">NOW PLAYING</div><div id="nowPlaying">NO SIGNAL · SELECT AUDIO</div><div id="radioStatus">No stream or local tracks loaded</div></div>
           <div class="player-controls"><button id="prevTrack" aria-label="Previous track" title="Previous">◀◀</button><button id="playPause" class="play" aria-label="Play or pause">▶</button><button id="nextTrack" aria-label="Next track" title="Next">▶▶</button><span class="volume-icon" aria-hidden="true">◖))</span><input type="range" id="radioVolume" aria-label="Radio volume" min="0" max="100" value="55"><span id="volumeValue">55</span></div>
           <div class="channel-rack">
-            <div class="channel-rack-title"><span>▰ SAVED CB CHANNELS</span><span id="channelCount">0 PRESETS</span></div>
+            <div class="channel-rack-title"><span>▰ SAVED CB CHANNELS</span><span id="channelCount">0 PRESETS</span></div><div class="settings-actions"><span id="settingsStatus">SAVED ON THIS PC</span><button type="button" id="exportSettings">EXPORT SETTINGS</button><button type="button" id="importSettings">IMPORT SETTINGS</button><input type="file" accept="application/json,.json" id="importSettingsFile" hidden></div>
             <div id="channelList" class="channel-list"><div class="channel-empty">No channels saved. Paste a shared playlist URL below.</div></div>
             <form id="channelForm" class="channel-form">
               <label class="field"><span>CHANNEL NAME</span><input type="text" id="channelName" maxlength="48" placeholder="e.g. Scooter's Roadhouse" required></label>
               <label class="field"><span>YOUTUBE MUSIC PLAYLIST URL</span><input type="url" id="channelUrl" placeholder="https://music.youtube.com/playlist?list=…" required></label>
-              <div class="channel-form-actions"><button type="submit" class="save-channel" id="saveChannel">+ SAVE CB CHANNEL</button><button type="button" class="cancel-edit" id="cancelChannelEdit" hidden>CANCEL EDIT</button></div>
-              <p id="channelMessage" role="status" aria-live="polite">Share a public or unlisted playlist. Saved presets stay on this PC and browser.</p>
+              <div class="channel-form-actions"><button type="button" class="cancel-edit" id="newChannel">＋ NEW CHANNEL</button><button type="submit" class="save-channel" id="saveChannel">+ SAVE CB CHANNEL</button><button type="button" class="cancel-edit" id="cancelChannelEdit" hidden>CANCEL EDIT</button></div>
+              <p id="channelMessage" role="status" aria-live="polite">Paste a shared playlist link. Channels and preferences are backed up in Windows AppData.</p>
             </form>
           </div>
           <div class="youtube-shell" id="youtubeShell" hidden>
-            <div class="youtube-shell-header"><strong>CH <span id="youtubeChannelNumber">19</span> · OFFICIAL YOUTUBE PLAYER</strong><button type="button" id="stopYouTube">■ OFF AIR</button></div>
+            <div class="youtube-shell-header"><strong>CH <span id="youtubeChannelNumber">19</span> · OFFICIAL YOUTUBE PLAYER</strong><div class="youtube-links"><a id="youtubeExternal" target="_blank" rel="noopener noreferrer" href="https://www.youtube.com/">OPEN ON YOUTUBE ↗</a><button type="button" id="stopYouTube">■ OFF AIR</button></div></div>
             <div id="youtubePlayerMount" class="youtube-player-mount"></div>
-            <p class="youtube-hint">YouTube video playback stays visible as required. If autoplay is blocked, click Play in the video. Private or restricted playlists may not embed.</p>
+            <p class="youtube-hint">The YouTube player stays visible. Unlisted shared playlists may work, but individual tracks can still block embedding. For failed embeds, use OPEN ON YOUTUBE.</p>
           </div>
           <div class="radio-inputs"><div class="source-label">OTHER SOURCES · LOCAL FILES &amp; INTERNET RADIO</div><label class="file-picker" for="audioFiles">+ ADD LOCAL MUSIC</label><input id="audioFiles" class="sr-only" type="file" multiple accept="audio/*"><div class="stream-row"><input id="streamUrl" type="url" placeholder="Internet radio stream URL (https://…)" aria-label="Internet radio URL"><button id="playStream" title="Play radio stream">TUNE IN</button></div></div>
           <div id="playlist" class="playlist"></div>
           <audio id="audioPlayer" preload="none"></audio>
         </div>
       </section>
-      <footer class="bottom"><span>4NIK8 ORE / INDUSTRIAL RECLAMATION</span><span class="version">PREVIEW v0.2.0 · LOCAL WINDOWS</span></footer>
+      <footer class="bottom"><span>4NIK8 ORE / INDUSTRIAL RECLAMATION</span><span class="version">PREVIEW v0.3.0 · LOCAL WINDOWS</span></footer>
     </main>
   </div>
   <script src="logic.js"></script>
