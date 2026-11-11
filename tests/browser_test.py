@@ -31,12 +31,14 @@ window.fetch=async(input,opts={})=>{
  throw Error('network disabled in integration test');
 };
 window.YT={PlayerState:{PLAYING:1,PAUSED:2,BUFFERING:3,ENDED:0},Player:class {
- constructor(el,opts){this.opts=opts;this.last=null;this.volume=0;this.destroyed=false;
+ constructor(el,opts){this.opts=opts;this.last=null;this.volume=0;this.destroyed=false;this.queue=[];this.shuffleCalls=[];
   window.__playerInstances.push(this);window.fakeYT=this;
   setTimeout(()=>opts.events.onReady({target:this}),0);
  }
  setVolume(n){this.volume=n;}
- loadPlaylist(args){this.last=args;this.opts.events.onStateChange({target:this,data:1});}
+ loadPlaylist(args){this.last=args;this.queue=['one','two','three'];this.opts.events.onStateChange({target:this,data:1});}
+ setShuffle(on){this.shuffleCalls.push(on);}
+ getPlaylist(){return this.queue;}
  playVideo(){this.opts.events.onStateChange({target:this,data:1});}
  pauseVideo(){this.opts.events.onStateChange({target:this,data:2});}
  destroy(){this.destroyed=true;}
@@ -56,6 +58,9 @@ with sync_playwright() as p:
  page.set_content(html,wait_until='domcontentloaded')
  page.wait_for_function("document.querySelector('#settingsStatus').textContent.includes('SAVED')")
  assert page.locator('#liverySelect').input_value()=='neon'
+ assert page.locator('#shuffleButton').get_attribute('aria-pressed')=='false'
+ page.locator('#shuffleButton').click()
+ assert page.locator('#shuffleButton').get_attribute('aria-pressed')=='true'
  page.locator('#liverySelect').select_option('oxide')
  assert page.evaluate('document.documentElement.dataset.livery')=='oxide'
  page.locator('#channelName').fill("Scooter's Roadhouse")
@@ -66,6 +71,7 @@ with sync_playwright() as p:
  page.wait_for_function('window.fakeYT && window.fakeYT.last && window.fakeYT.last.list==="'+ID1+'"')
  assert page.locator('#youtubeShell').is_visible()
  assert 'Test track' in page.locator('#nowPlaying').inner_text()
+ assert page.evaluate('window.fakeYT.shuffleCalls')==[True]
  # New station must add rather than overwrite the existing one.
  page.locator('#newChannel').click()
  page.locator('#channelName').fill('Wormhole Country')
@@ -76,13 +82,18 @@ with sync_playwright() as p:
  page.wait_for_function('window.fakeYT && window.fakeYT.last && window.fakeYT.last.list==="'+ID2+'"')
  assert page.evaluate('window.__playerInstances[0].destroyed')
  assert page.evaluate('window.__playerInstances.length')==2
+ assert page.evaluate('window.fakeYT.shuffleCalls')==[True]
  assert 'list='+ID2 in page.locator('#youtubeExternal').get_attribute('href')
  page.evaluate('window.fakeYT.emitError(2)')
- assert 'Invalid YouTube player parameter' in page.locator('#radioStatus').inner_text()
- assert 'not mean your unlisted' in page.locator('#channelMessage').inner_text()
+ page.wait_for_function('window.__playerInstances.length===3')
+ assert page.evaluate('window.__playerInstances[1].destroyed')
+ assert page.evaluate('window.fakeYT.opts.playerVars.list')==ID2
+ page.evaluate('window.fakeYT.emitError(2)')
+ assert 'YouTube rejected the embedded playlist request' in page.locator('#radioStatus').inner_text()
+ assert 'sharing setting is wrong' in page.locator('#channelMessage').inner_text()
  page.locator('[data-tune]').first.click()
  page.wait_for_function('window.fakeYT && window.fakeYT.last && window.fakeYT.last.list==="'+ID1+'"')
- assert page.evaluate('window.__playerInstances.length')==3
+ assert page.evaluate('window.__playerInstances.length')==4
  # Editing remains isolated; switching back/forth retains IDs.
  page.locator('[data-edit]').nth(0).click()
  page.locator('#channelName').fill('Scooter FM')
@@ -95,6 +106,7 @@ with sync_playwright() as p:
  # Debounced persistence goes to a simulated AppData server, not just browser cache.
  page.wait_for_function('window.__diskSettings && window.__diskSettings.radio.channels.length===2 && window.__diskSettings.radio.volume===45',timeout=5000)
  assert page.evaluate('window.__diskSettings.livery')=='oxide'
+ assert page.evaluate('window.__diskSettings.radio.shuffle') is True
  page.locator('#radioCollapse').click()
  assert page.locator('#youtubeShell').is_hidden()
  page.locator('#radioCollapse').click()
@@ -105,6 +117,7 @@ with sync_playwright() as p:
  page.wait_for_function("document.querySelectorAll('.channel-preset').length===2")
  assert page.locator('#radioVolume').input_value()=='45'
  assert page.locator('#liverySelect').input_value()=='oxide'
+ assert page.locator('#shuffleButton').get_attribute('aria-pressed')=='true'
  assert 'Scooter FM' in page.locator('#channelList').inner_text()
  # Export settings is a real, user-initiated download.
  with page.expect_download() as item:
@@ -117,6 +130,10 @@ with sync_playwright() as p:
  page.locator('#channelUrl').fill('https://example.com/?list='+ID1)
  page.locator('#saveChannel').click()
  assert 'Only shared' in page.locator('#channelMessage').inner_text()
+ # Toggle back to normal playback and verify its saved setting.
+ page.locator('#shuffleButton').click()
+ assert page.locator('#shuffleButton').get_attribute('aria-pressed')=='false'
+ page.wait_for_function('window.__diskSettings.radio.shuffle===false',timeout=5000)
  assert not errors, errors
- print('PASS: 2 saved playlists, player reset on switch, error-2 guidance, AppData mock persistence, migration, station edit/delete, settings export, 1080x1920, livery.')
+ print('PASS: shuffled playlists, switching/reapply, error-2 fallback, settings migration, editing, export, portrait neon default.')
  browser.close()

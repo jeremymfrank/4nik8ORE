@@ -90,6 +90,11 @@ try {
                if ($allowed -notcontains [string]$doc.livery) { throw 'Unrecognized livery' }
                $volume = [int]$doc.radio.volume
                if ($volume -lt 0 -or $volume -gt 100) { throw 'Invalid volume' }
+               $shuffle = $false
+               if ($null -ne $doc.radio.shuffle) {
+                  if ($doc.radio.shuffle -isnot [bool]) { throw 'Invalid shuffle option' }
+                  $shuffle = [bool]$doc.radio.shuffle
+               }
                $channels = @($doc.radio.channels)
                if ($channels.Count -gt 40) { throw 'Too many channels' }
                $cleanChannels = @()
@@ -99,7 +104,18 @@ try {
                   $list = [string]$c.playlistId
                   if ($id.Length -lt 1 -or $id.Length -gt 90 -or $name.Length -lt 1 -or $name.Length -gt 48 -or
                       $list -cnotmatch '^[a-zA-Z0-9_-]{10,150}$') { throw 'Invalid radio channel' }
-                  $cleanChannels += [ordered]@{id=$id;name=$name;playlistId=$list;url=('https://music.youtube.com/playlist?list='+$list)}
+                  # Retain the user's actual shared link, including any Google-provided
+                  # query token. Validate it is HTTPS on an approved YouTube host.
+                  $savedUrl = [string]$c.url
+                  $uri = $null
+                  $safe = $savedUrl.Length -le 2048 -and
+                     [System.Uri]::TryCreate($savedUrl,[System.UriKind]::Absolute,[ref]$uri) -and
+                     $uri.Scheme -eq 'https' -and
+                     (@('music.youtube.com','youtube.com','www.youtube.com','m.youtube.com','youtu.be') -contains $uri.Host.ToLowerInvariant()) -and
+                     $uri.Query -match '(?:^\?|&)list=([^&]+)' -and
+                     [System.Uri]::UnescapeDataString($Matches[1]) -ceq $list
+                  if (-not $safe) { $savedUrl = 'https://music.youtube.com/playlist?list='+$list }
+                  $cleanChannels += [ordered]@{id=$id;name=$name;playlistId=$list;url=$savedUrl}
                }
                $resource = [string]$doc.scanner.resource
                if (@('ore','ice') -notcontains $resource) { throw 'Invalid resource' }
@@ -113,7 +129,7 @@ try {
                if ($selection.Length -gt 90) { $selection = '' }
                $clean = [ordered]@{
                   schemaVersion=1; livery=[string]$doc.livery;
-                  radio=[ordered]@{volume=$volume;channels=$cleanChannels;selectedChannelId=$selection};
+                  radio=[ordered]@{volume=$volume;shuffle=$shuffle;channels=$cleanChannels;selectedChannelId=$selection};
                   scanner=[ordered]@{system=$sys;hub=$hub;resource=$resource;cargo=$cargo}
                }
                $json = ConvertTo-Json -InputObject $clean -Depth 8 -Compress

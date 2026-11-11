@@ -47,7 +47,7 @@ api.parseYouTubePlaylistUrl=function(raw){
   if(list.startsWith('VL') && /^(?:PL|OLAK|UU|FL|RDCLAK)/.test(list.slice(2)))list=list.slice(2);
   if(!/^[A-Za-z0-9_-]{10,150}$/.test(list))
     throw Error('No usable playlist ID was found. Share the playlist itself, not a single song or private library view.');
-  return {playlistId:list,canonicalUrl:'https://music.youtube.com/playlist?list='+encodeURIComponent(list)};
+  return {playlistId:list,canonicalUrl:'https://music.youtube.com/playlist?list='+encodeURIComponent(list),shareUrl:u.href};
 };
 api.formatIsk=function(n,digits=0){return Number.isFinite(n)?new Intl.NumberFormat('en-US',{maximumFractionDigits:digits}).format(n):'—';};
 api.escape=function(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));};

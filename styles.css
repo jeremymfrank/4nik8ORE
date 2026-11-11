@@ -151,3 +151,9 @@ body{background:radial-gradient(ellipse at 58% 0%,#373023 0%,transparent 28%),re
 .brand-icon img{display:block;width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 0 4px #ff6a1728)}
 /* Purple and wine corner chevrons from the official in-game identity. */
 .masthead:after{width:86px;opacity:.9;background:repeating-linear-gradient(115deg,#291034 0 12px,#7d3293 12px 25px,#210e19 25px 37px,#681c2d 37px 48px,#0f1118 48px 53px)}
+
+/* v0.3.2 - CB shuffle button, 4NIK8 Neon Freight stays the default */
+.player-controls .shuffle-toggle{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:78px;min-height:43px;padding:0 9px;border:1px solid var(--edge);border-radius:5px;background:linear-gradient(#28282f,#181d23);color:var(--muted);font-size:11px;font-weight:900;letter-spacing:.4px;cursor:pointer;white-space:nowrap}
+.player-controls .shuffle-toggle[aria-pressed="true"]{border-color:#7cf7d2;background:linear-gradient(135deg,#1d4648,#43295c);color:#a8fff1;box-shadow:0 0 12px #4af4d030,inset 0 0 7px #59ebae22}
+.player-controls .shuffle-toggle:focus-visible{outline:3px solid #ffd078;outline-offset:3px}
+@media(max-width:640px){.player-controls .shuffle-toggle{min-width:42px;padding:0 6px}.player-controls .shuffle-toggle span{display:none}}

@@ -47,7 +47,7 @@
         <div class="radio-header"><div class="radio-mark" aria-hidden="true">◉</div><div class="grow"><div class="eyebrow">CH 19 / 4NIK8 ORE ENTERTAINMENT</div><h2>CB ContraBand Radio</h2><div class="radio-tagline">If CONCORD asks, you ain't heard nothin'.</div></div><button class="radio-collapse" id="radioCollapse" aria-expanded="true" title="Collapse radio">▾</button></div>
         <div id="radioContent">
           <div class="frequency"><div class="smallcaps">NOW PLAYING</div><div id="nowPlaying">NO SIGNAL · SELECT AUDIO</div><div id="radioStatus">No stream or local tracks loaded</div></div>
-          <div class="player-controls"><button id="prevTrack" aria-label="Previous track" title="Previous">◀◀</button><button id="playPause" class="play" aria-label="Play or pause">▶</button><button id="nextTrack" aria-label="Next track" title="Next">▶▶</button><span class="volume-icon" aria-hidden="true">◖))</span><input type="range" id="radioVolume" aria-label="Radio volume" min="0" max="100" value="55"><span id="volumeValue">55</span></div>
+          <div class="player-controls"><button id="prevTrack" aria-label="Previous track" title="Previous">◀◀</button><button id="playPause" class="play" aria-label="Play or pause">▶</button><button id="nextTrack" aria-label="Next track" title="Next">▶▶</button><button type="button" id="shuffleButton" class="shuffle-toggle" aria-label="Shuffle playback" aria-pressed="false" title="Shuffle: off">⤨ <span>SHUFFLE</span></button><span class="volume-icon" aria-hidden="true">◖))</span><input type="range" id="radioVolume" aria-label="Radio volume" min="0" max="100" value="55"><span id="volumeValue">55</span></div>
           <div class="channel-rack">
             <div class="channel-rack-title"><span>▰ SAVED CB CHANNELS</span><span id="channelCount">0 PRESETS</span></div><div class="settings-actions"><span id="settingsStatus">SAVED ON THIS PC</span><button type="button" id="exportSettings">EXPORT SETTINGS</button><button type="button" id="importSettings">IMPORT SETTINGS</button><input type="file" accept="application/json,.json" id="importSettingsFile" hidden></div>
             <div id="channelList" class="channel-list"><div class="channel-empty">No channels saved. Paste a shared playlist URL below.</div></div>
@@ -59,16 +59,16 @@
             </form>
           </div>
           <div class="youtube-shell" id="youtubeShell" hidden>
-            <div class="youtube-shell-header"><strong>CH <span id="youtubeChannelNumber">19</span> · OFFICIAL YOUTUBE PLAYER</strong><div class="youtube-links"><a id="youtubeExternal" target="_blank" rel="noopener noreferrer" href="https://www.youtube.com/">OPEN ON YOUTUBE ↗</a><button type="button" id="stopYouTube">■ OFF AIR</button></div></div>
+            <div class="youtube-shell-header"><strong>CH <span id="youtubeChannelNumber">19</span> · OFFICIAL YOUTUBE PLAYER</strong><div class="youtube-links"><a id="youtubeExternal" target="_blank" rel="noopener noreferrer" href="https://www.youtube.com/">OPEN IN YOUTUBE MUSIC ↗</a><button type="button" id="stopYouTube">■ OFF AIR</button></div></div>
             <div id="youtubePlayerMount" class="youtube-player-mount"></div>
-            <p class="youtube-hint">The YouTube player stays visible. Unlisted shared playlists may work, but individual tracks can still block embedding. For failed embeds, use OPEN ON YOUTUBE.</p>
+            <p class="youtube-hint">The YouTube player stays visible. Unlisted shared playlists may work, but individual tracks can still block embedding. If YouTube rejects the embedded player, use OPEN IN YOUTUBE MUSIC.</p>
           </div>
           <div class="radio-inputs"><div class="source-label">OTHER SOURCES · LOCAL FILES &amp; INTERNET RADIO</div><label class="file-picker" for="audioFiles">+ ADD LOCAL MUSIC</label><input id="audioFiles" class="sr-only" type="file" multiple accept="audio/*"><div class="stream-row"><input id="streamUrl" type="url" placeholder="Internet radio stream URL (https://…)" aria-label="Internet radio URL"><button id="playStream" title="Play radio stream">TUNE IN</button></div></div>
           <div id="playlist" class="playlist"></div>
           <audio id="audioPlayer" preload="none"></audio>
         </div>
       </section>
-      <footer class="bottom"><span>4NIK8 ORE / INDUSTRIAL RECLAMATION</span><span class="version">PREVIEW v0.3.1 · LOCAL WINDOWS</span></footer>
+      <footer class="bottom"><span>4NIK8 ORE / INDUSTRIAL RECLAMATION</span><span class="version">PREVIEW v0.3.2 · LOCAL WINDOWS</span></footer>
     </main>
   </div>
   <script src="logic.js"></script>

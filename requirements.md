@@ -36,3 +36,9 @@ Never label market price as a guaranteed executable payout; never label a market
 
 - Launcher script must be valid in Windows PowerShell 5.1: use ASCII-only for `.ps1` source or UTF-8 BOM, and include a static regression test to catch non-ASCII syntax hazards.
 - Release ZIP must include every referenced asset.
+
+## CB Shuffle and link handling (v0.3.2)
+- Toggle SHUFFLE with a persistent pressed state; YouTube `setShuffle(true/false)` and restore shuffle on station change once playlist data is loaded.
+- Playlist error 2 triggers at most one alternate official embed initialization. Do not retry indefinitely.
+- Store original validated music.youtube.com share URLs in AppData; preserve all user station presets and volume.
+- 4NIK8 Neon Freight is the first-install default; existing selected livery overrides the default.

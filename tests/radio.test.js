@@ -7,6 +7,8 @@ const id='PL1234567890abcdefghij';
 assert.equal(parse('https://music.youtube.com/playlist?list='+id+'&si=something').playlistId,id);
 assert.equal(parse('https://music.youtube.com/watch?v=abcdefghijk&list='+id).playlistId,id);
 assert.equal(parse('https://www.youtube.com/playlist?list='+id).playlistId,id);
+assert.equal(parse('https://music.youtube.com/playlist?list=PLRyHdbzeN03A').playlistId,'PLRyHdbzeN03A');
+assert.equal(parse('https://music.youtube.com/playlist?list=PLfXw8cc_z-vY&si=keep-share-link').shareUrl,'https://music.youtube.com/playlist?list=PLfXw8cc_z-vY&si=keep-share-link');
 assert.equal(parse('https://music.youtube.com/browse/VL'+id).playlistId,id);
 assert.equal(parse('https://youtube.com/watch?list='+id+'&v=abcdefghijk').canonicalUrl,'https://music.youtube.com/playlist?list='+id);
 assert.throws(()=>parse('https://music.youtube.com/watch?v=abcdefghijk'),/No usable playlist ID/);

@@ -8,7 +8,7 @@ const RESOURCES={
 const MARKETS={'10000043':'Amarr / Domain','10000002':'Jita / The Forge','10000030':'Rens / Heimatar','10000042':'Hek / Metropolis','10000032':'Dodixie / Sinq Laison','10000038':'The Bleak Lands','10000068':'Verge Vendor'};
 const CACHE_TTL=300000; const memCache=new Map();
 const state={resource:'ore',system:null,region:null,hub:10000043,results:[],selected:null,lastRun:0,inProgress:false,runId:0};
-const ua='4NIK8-Industrial-Command-Preview/0.3.0';
+const ua='4NIK8-Industrial-Command-Preview/0.3.2';
 const esi='https://esi.evetech.net/latest';
 function url(path){return esi+path+(path.includes('?')?'&':'?')+'datasource=tranquility&compatibility_date=2025-09-30&user_agent='+encodeURIComponent(ua);}
 function setStatus(status,detail){$('connectionBadge').className='conn-status '+status;$('connectionBadge').querySelector('span:last-child').textContent=detail;}
@@ -152,11 +152,13 @@ async function routeToBuyer(stationId){
 }
 function radioInit(){
  const audio=$('audioPlayer');
- const STORAGE='4nik8.cb.channels.v1', VOLUME_KEY='4nik8.cb.volume.v1';
+ const STORAGE='4nik8.cb.channels.v1', VOLUME_KEY='4nik8.cb.volume.v1', SHUFFLE_KEY='4nik8.cb.shuffle.v1';
  const maxChannels=40;
  let channels=[],editId=null,selectedChannelId=null;
  let source='none',audioIndex=-1,ytPlayer=null,ytReady=false,ytPlaying=false;
  let ytApiPromise=null,ytPlayerPromise=null,trackTitle='',tuneSequence=0;
+ let shuffleEnabled=false,shuffleApplied=false;
+ let localShuffleBag=[];
  const audioTracks=[];
  const volumeInput=$('radioVolume');
  try{
@@ -168,6 +170,27 @@ function radioInit(){
  }catch(_){channels=[];}
  try{const v=+localStorage.getItem(VOLUME_KEY);if(Number.isFinite(v)&&v>=0&&v<=100)volumeInput.value=v;}catch(_){}
  audio.volume=+volumeInput.value/100;$('volumeValue').textContent=volumeInput.value;
+ try{shuffleEnabled=localStorage.getItem(SHUFFLE_KEY)==='1';}catch(_){}
+ function showShuffle(){const b=$('shuffleButton');b.setAttribute('aria-pressed',String(shuffleEnabled));b.title='Shuffle: '+(shuffleEnabled?'on':'off');}
+ function applyYouTubeShuffle(){
+  if(!ytReady||!ytPlayer||typeof ytPlayer.setShuffle!=='function')return false;
+  // YouTube does not retain shuffle across playlist loads. Wait for the queue
+  // to exist so the choice applies to the newly loaded channel.
+  let queue=[];try{queue=ytPlayer.getPlaylist?.()||[];}catch(_){}
+  if(!queue.length)return false;
+  try{ytPlayer.setShuffle(shuffleEnabled);shuffleApplied=true;return true;}catch(_){return false;}
+ }
+ showShuffle();
+ $('shuffleButton').addEventListener('click',()=>{
+  shuffleEnabled=!shuffleEnabled;localShuffleBag=[];shuffleApplied=false;showShuffle();
+  try{localStorage.setItem(SHUFFLE_KEY,shuffleEnabled?'1':'0');}catch(_){}
+  settingsManager.schedule();
+  if(source==='youtube'){
+   if(!applyYouTubeShuffle())status('Shuffle '+(shuffleEnabled?'enabled':'disabled')+'; will apply when the playlist loads.');
+   else status('YouTube playlist shuffle '+(shuffleEnabled?'ON':'OFF')+'.');
+  }else if(source==='audio')status('Local music shuffle '+(shuffleEnabled?'ON':'OFF')+'.');
+  else status('Shuffle '+(shuffleEnabled?'ON':'OFF')+'. Tune a channel to play.');
+ });
  function persist(){try{localStorage.setItem(STORAGE,JSON.stringify(channels));settingsManager.schedule();return true;}catch(e){setChannelMessage('Presets could not be saved in browser storage: '+e.message,true);return false;}}
  function setChannelMessage(msg,isError=false){$('channelMessage').textContent=msg;$('channelMessage').classList.toggle('error',isError);}
  function channel(){return channels.find(c=>c.id===selectedChannelId)||null;}
@@ -206,7 +229,7 @@ function radioInit(){
   if(!editId&&channels.length>=maxChannels){setChannelMessage('Maximum '+maxChannels+' saved channels reached.',true);return;}
   const duplicate=channels.find(c=>c.playlistId===parsed.playlistId&&c.id!==editId);
   if(duplicate){setChannelMessage('That playlist is already saved as CH '+channelNumber(duplicate.id)+' · '+duplicate.name+'. Use TUNE or EDIT.',true);return;}
-  const saved={id:editId||String(Date.now())+'-'+Math.random().toString(36).slice(2,10),name:name.slice(0,48),url:parsed.canonicalUrl,playlistId:parsed.playlistId};
+  const saved={id:editId||String(Date.now())+'-'+Math.random().toString(36).slice(2,10),name:name.slice(0,48),url:parsed.shareUrl||parsed.canonicalUrl,playlistId:parsed.playlistId};
   if(editId){const index=channels.findIndex(c=>c.id===editId);if(index>=0)channels[index]=saved;else channels.push(saved);}else channels.push(saved);
   const wasActive=selectedChannelId===saved.id;
   persist();cancelEdit();renderChannels();
@@ -225,7 +248,7 @@ function radioInit(){
   ++tuneSequence;
   if(ytPlayer&&typeof ytPlayer.destroy==='function'){try{ytPlayer.destroy();}catch(_){}}
   else if(ytPlayer&&typeof ytPlayer.stopVideo==='function'){try{ytPlayer.stopVideo();}catch(_){}}
-  ytPlayer=null;ytReady=false;ytPlaying=false;ytPlayerPromise=null;
+  ytPlayer=null;ytReady=false;ytPlaying=false;ytPlayerPromise=null;shuffleApplied=false;
   $('youtubePlayerMount').replaceChildren();
  }
  function stopYouTube(){
@@ -247,10 +270,10 @@ function radioInit(){
   }).catch(e=>{ytApiPromise=null;throw e;});
   return ytApiPromise;
  }
- // Each saved CB station gets a fresh YouTube player. Reusing the previous iframe
- // could leave an old playlist/video queued when quickly changing channels.
+ // YouTube Music share links are not inherently invalid because their IDs are
+ // shorter than familiar IDs. Preserve the original shared URL for fallback.
  function errorDescription(code){
-  const descriptions={2:'Invalid YouTube player parameter or playlist identifier (not a playlist visibility error).',5:'YouTube HTML5 player error.',100:'A video was removed, unavailable, or private.',101:'A video owner disabled embedding.',150:'A video owner disabled embedding.',153:'YouTube rejected the embedded client identity / HTTP referrer.'};
+  const descriptions={2:'YouTube rejected the embedded playlist request (invalid parameter).',5:'YouTube HTML5 player error.',100:'A video is unavailable or private.',101:'The video owner disabled embedding.',150:'The video owner disabled embedding.',153:'YouTube rejected the embedded client identity / HTTP referrer.'};
   return descriptions[code]||'YouTube could not play this content.';
  }
  async function tuneChannel(id){
@@ -258,39 +281,46 @@ function radioInit(){
   if(location.protocol==='file:'){
    setChannelMessage('Launch with START_COMMAND.cmd to use the localhost YouTube player.',true);return;
   }
-  audio.pause();
-  resetYouTubePlayer();const generation=tuneSequence;
+  audio.pause();resetYouTubePlayer();const generation=tuneSequence;
   source='youtube';selectedChannelId=id;trackTitle='';
   try{localStorage.setItem('4nik8.cb.lastChannel.v1',id);}catch(_){}
   settingsManager.schedule();
   $('radioContent').hidden=false;$('radioCollapse').textContent='▾';$('radioCollapse').setAttribute('aria-expanded','true');
   $('youtubeShell').hidden=false;renderChannels();nowPlaying();status('Tuning CH '+channelNumber(id)+'…');
-  $('youtubeExternal').href='https://www.youtube.com/playlist?list='+encodeURIComponent(requested.playlistId);
+  // Link back to the original music.youtube.com share URL. Never silently
+  // substitute a made-up playlist URL when the user copied the correct link.
+  $('youtubeExternal').href=requested.url;
   try {
    const YT=await ensureYouTubeApi();
    if(generation!==tuneSequence)return;
-   ytPlayerPromise=new Promise((resolve,reject)=>{
-    const timer=setTimeout(()=>reject(Error('YouTube player did not initialize.')),18000);
+   let retryUsed=false;
+   function createPlayer(mode){
+    if(generation!==tuneSequence || selectedChannelId!==id)return;
+    if(ytPlayer){try{ytPlayer.destroy();}catch(_){}ytPlayer=null;}
+    ytReady=false;ytPlaying=false;shuffleApplied=false;
+    $('youtubePlayerMount').replaceChildren();
+    const vars={playsinline:1,controls:1,rel:0,origin:window.location.origin};
+    // Official alternative: select the playlist through the embed's playerVars
+    // rather than requesting it later through loadPlaylist().
+    if(mode==='embed'){vars.listType='playlist';vars.list=requested.playlistId;}
     ytPlayer=new YT.Player('youtubePlayerMount',{
-     width:'100%',height:'100%',
-     playerVars:{playsinline:1,controls:1,rel:0,origin:window.location.origin},
+     width:'100%',height:'100%',playerVars:vars,
      events:{
       onReady(event){
-       clearTimeout(timer);
-       if(generation!==tuneSequence)return;
+       if(generation!==tuneSequence || event.target!==ytPlayer)return;
        ytReady=true;
        event.target.setVolume(+volumeInput.value);
-       // Official playlist API accepts the bare playlist ID from the share URL.
-       event.target.loadPlaylist({list:requested.playlistId,listType:'playlist',index:0});
-       status('Playlist requested. If autoplay is blocked, use Play on the YouTube player.');
-       resolve(event.target);
+       if(mode==='api')event.target.loadPlaylist({list:requested.playlistId,listType:'playlist',index:0});
+       status(mode==='embed'?'Trying alternate official YouTube playlist embed…':'Playlist requested. If autoplay is blocked, press Play in the YouTube player.');
       },
       onStateChange(event){
-       if(generation!==tuneSequence)return;
+       if(generation!==tuneSequence || event.target!==ytPlayer)return;
        ytPlaying=event.data===YT.PlayerState.PLAYING;
        if(source==='youtube'){
+        // setShuffle does not persist across YouTube playlist loads.
+        if(!shuffleApplied && (event.data===YT.PlayerState.PLAYING || event.data===5))applyYouTubeShuffle();
         try{trackTitle=event.target.getVideoData()?.title||'';}catch(_){trackTitle='';}
-        if(event.data===YT.PlayerState.PLAYING)status('Broadcasting CH '+channelNumber(id)+' from YouTube');
+        if(event.data===YT.PlayerState.PLAYING)status('Broadcasting CH '+channelNumber(id)+' from YouTube'+(shuffleEnabled?' · SHUFFLE ON':''));
         else if(event.data===YT.PlayerState.PAUSED)status('YouTube playback paused');
         else if(event.data===YT.PlayerState.BUFFERING)status('Tuning YouTube stream…');
         else if(event.data===YT.PlayerState.ENDED)status('Playlist ended.');
@@ -298,15 +328,30 @@ function radioInit(){
        }
       },
       onError(event){
-       if(generation!==tuneSequence || source!=='youtube')return;
-       status('YouTube error '+event.data+': '+errorDescription(event.data)+' Use OPEN ON YOUTUBE if needed.');
-       setChannelMessage('CH '+channelNumber(id)+' did not embed. Playlist ID: '+requested.playlistId+'. This does not mean your unlisted sharing is wrong.',true);
+       if(generation!==tuneSequence || source!=='youtube'||event.target!==ytPlayer)return;
+       // One transparent compatibility attempt. We do not retry forever or
+       // claim it fixes YouTube Music's own embed restrictions.
+       if(event.data===2 && mode==='api' && !retryUsed){
+        retryUsed=true;
+        status('YouTube rejected playlist API request. Trying its standard playlist embed once…');
+        setChannelMessage('Trying the alternate official YouTube playlist embed for CH '+channelNumber(id)+'.');
+        setTimeout(()=>createPlayer('embed'),0);
+        return;
+       }
+       status('YouTube error '+event.data+': '+errorDescription(event.data)+' Open your original link in YouTube Music if needed.');
+       setChannelMessage('CH '+channelNumber(id)+' could not play inside the official embed. The saved shared link is still intact; this does not mean the sharing setting is wrong.',true);
       }
      }
     });
-   });
-   await ytPlayerPromise;
-  } catch(err){if(generation===tuneSequence){ytPlayerPromise=null;status('Cannot tune YouTube: '+err.message);}}
+   }
+   createPlayer('api');
+  } catch(err){if(generation===tuneSequence)status('Cannot tune YouTube: '+err.message);}
+ }
+ function nextLocalAudioIndex(){
+  if(!shuffleEnabled||audioTracks.length<2)return audioIndex<0?0:(audioIndex+1)%audioTracks.length;
+  if(!localShuffleBag.length)localShuffleBag=audioTracks.map((t,i)=>i).filter(i=>i!==audioIndex && t.local);
+  if(!localShuffleBag.length)return audioIndex<0?0:(audioIndex+1)%audioTracks.length;
+  const at=Math.floor(Math.random()*localShuffleBag.length);return localShuffleBag.splice(at,1)[0];
  }
  function renderLocalPlaylist(){
   $('playlist').innerHTML=audioTracks.map((t,i)=>`<button class="${source==='audio'&&i===audioIndex?'active':''}" data-index="${i}">${L.escape(t.name)}</button>`).join('');
@@ -323,6 +368,7 @@ function radioInit(){
  $('audioFiles').addEventListener('change',e=>{
   const files=Array.from(e.target.files||[]);
   for(const file of files)audioTracks.push({name:file.name.replace(/\.[^.]+$/,''),url:URL.createObjectURL(file),local:true});
+   localShuffleBag=[];
   renderLocalPlaylist();if(audioIndex<0&&audioTracks.length)playAudio(0);e.target.value='';
  });
  $('playStream').addEventListener('click',()=>{
@@ -341,8 +387,8 @@ function radioInit(){
   if(audio.paused){try{await audio.play();}catch(e){status(e.message);}}else audio.pause();nowPlaying();
  });
  $('prevTrack').addEventListener('click',()=>{if(source==='youtube'&&ytReady)ytPlayer.previousVideo();else if(audioTracks.length)playAudio(audioIndex<0?0:audioIndex-1);});
- $('nextTrack').addEventListener('click',()=>{if(source==='youtube'&&ytReady)ytPlayer.nextVideo();else if(audioTracks.length)playAudio(audioIndex<0?0:audioIndex+1);});
- audio.addEventListener('ended',()=>{if(source==='audio'&&audioIndex>=0)playAudio(audioIndex+1);});
+ $('nextTrack').addEventListener('click',()=>{if(source==='youtube'&&ytReady)ytPlayer.nextVideo();else if(audioTracks.length)playAudio(nextLocalAudioIndex());});
+ audio.addEventListener('ended',()=>{if(source==='audio'&&audioIndex>=0)playAudio(nextLocalAudioIndex());});
  audio.addEventListener('play',()=>{if(source==='audio')nowPlaying();});
  audio.addEventListener('pause',()=>{if(source==='audio')nowPlaying();});
  volumeInput.addEventListener('input',e=>{
@@ -372,7 +418,7 @@ $('scanForm').addEventListener('submit',e=>{e.preventDefault();settingsManager.s
 // Settings are stored in %LOCALAPPDATA% via the loopback host, outside the
 // extracted release folder. Browser storage is retained for v0.2 migration.
 const settingsManager=(()=>{
- const keys={channels:'4nik8.cb.channels.v1',volume:'4nik8.cb.volume.v1',livery:'4nik8.dashboard.livery.v1',last:'4nik8.cb.lastChannel.v1'};
+ const keys={channels:'4nik8.cb.channels.v1',volume:'4nik8.cb.volume.v1',shuffle:'4nik8.cb.shuffle.v1',livery:'4nik8.dashboard.livery.v1',last:'4nik8.cb.lastChannel.v1'};
  let timer=null,queue=Promise.resolve(),started=false;
  const readLocal=(key,fallback)=>{try{const v=localStorage.getItem(key);return v===null?fallback:v;}catch(_){return fallback;}};
  function capture(){
@@ -380,7 +426,7 @@ const settingsManager=(()=>{
   if(!Array.isArray(channels))channels=[];
   const n=Number(readLocal(keys.volume,'55'));
   return {schemaVersion:1,livery:readLocal(keys.livery,'neon'),
-   radio:{volume:Number.isFinite(n)?Math.max(0,Math.min(100,n)):55,channels:channels.slice(0,40),selectedChannelId:readLocal(keys.last,'')},
+   radio:{volume:Number.isFinite(n)?Math.max(0,Math.min(100,n)):55,shuffle:readLocal(keys.shuffle,'0')==='1',channels:channels.slice(0,40),selectedChannelId:readLocal(keys.last,'')},
    scanner:{system:$('systemInput').value.trim(),hub:$('hubSelect').value,resource:state.resource,cargo:Math.max(1,Math.trunc(+$('cargoVolume').value||31625))}};
  }
  function apply(data){
@@ -389,6 +435,7 @@ const settingsManager=(()=>{
    if(['neon','steel','amber','oxide'].includes(data.livery))localStorage.setItem(keys.livery,data.livery);
    if(Array.isArray(data.radio?.channels))localStorage.setItem(keys.channels,JSON.stringify(data.radio.channels));
    if(Number.isFinite(+data.radio?.volume))localStorage.setItem(keys.volume,String(data.radio.volume));
+    if(typeof data.radio?.shuffle==='boolean')localStorage.setItem(keys.shuffle,data.radio.shuffle?'1':'0');
    if(typeof data.radio?.selectedChannelId==='string')localStorage.setItem(keys.last,data.radio.selectedChannelId);
   }catch(_){}
   const scan=data.scanner||{};
@@ -438,9 +485,10 @@ const settingsManager=(()=>{
   const d=JSON.parse(await file.text());
   if(d?.schemaVersion!==1||!Array.isArray(d.radio?.channels)||d.radio.channels.length>40)throw Error('Not a compatible 4NIK8 settings file.');
   // Never execute imported content; validate IDs and URLs before storing.
-  for(const c of d.radio.channels){if(typeof c.name!=='string'||c.name.length>48||!c.name.trim())throw Error('Invalid channel name'); const p=L.parseYouTubePlaylistUrl(c.url);c.playlistId=p.playlistId;c.url=p.canonicalUrl;if(!c.id||String(c.id).length>90)throw Error('Invalid preset ID');}
+  for(const c of d.radio.channels){if(typeof c.name!=='string'||c.name.length>48||!c.name.trim())throw Error('Invalid channel name'); const p=L.parseYouTubePlaylistUrl(c.url);c.playlistId=p.playlistId;c.url=p.shareUrl||p.canonicalUrl;if(!c.id||String(c.id).length>90)throw Error('Invalid preset ID');}
   if(!['neon','steel','amber','oxide'].includes(d.livery))throw Error('Unrecognized livery');
   if(!(Number.isFinite(+d.radio.volume)&&+d.radio.volume>=0&&+d.radio.volume<=100))throw Error('Invalid volume');
+  if(d.radio.shuffle!==undefined&&typeof d.radio.shuffle!=='boolean')throw Error('Invalid shuffle setting');
   apply(d);await save();location.reload();
  }
  function wire(){

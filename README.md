@@ -1,4 +1,4 @@
-# 4NIK8 ORE — Industrial Command (Preview v0.3.1)
+# 4NIK8 ORE — Industrial Command (Preview v0.3.2)
 
 **Local-only, single-user EVE Online mining-market prototype**, optimized for a **1080×1920 portrait side monitor**. Features the **CB ContraBand Radio** with saved YouTube Music / YouTube playlist channels.
 
@@ -15,11 +15,11 @@ There are **no EVE or Google account credentials required** for public market sc
 
 ## CB ContraBand Radio details
 
-- Save up to 40 locally named playlist presets; rename, delete, tune, skip, pause, and adjust playback volume.
+- Save up to 40 locally named playlist presets; rename, delete, tune, skip, pause, adjust playback volume, and **toggle SHUFFLE**. The shuffle preference is stored alongside your stations in Windows AppData and is reapplied when you tune a new YouTube playlist. Local file tracks shuffle as well.
 - Accepts `https://music.youtube.com/playlist?list=...`, `https://www.youtube.com/playlist?list=...`, and YouTube Music shared `watch?...&list=...` or `/browse/VL...` URLs.
-- Saved channels, volume, livery and scanner preferences are written to **`%LOCALAPPDATA%\4NIK8 ORE\Industrial Command\settings.json`**, independent of the ZIP extraction folder. Browser `localStorage` remains as a fallback; first v0.3 launch migrates presets from v0.2. **`settings.json.bak`** is maintained on updates. **EXPORT SETTINGS** downloads a JSON backup; **IMPORT SETTINGS** restores one. Install updates by extracting the next build and closing the old local server first.
+- Saved channels, volume, livery and scanner preferences are written to **`%LOCALAPPDATA%\4NIK8 ORE\Industrial Command\settings.json`**, independent of the ZIP extraction folder. Browser `localStorage` remains as a fallback; first v0.3 launch migrates presets from v0.2. **`settings.json.bak`** is maintained on updates. The local server now retains the original verified YouTube Music share URLs and shuffle state when saving settings. **EXPORT SETTINGS** downloads a JSON backup; **IMPORT SETTINGS** restores one. Install updates by extracting the next build and closing the old local server first.
 - **Second-channel bug fix:** Each TUNE initializes a fresh YouTube iframe. The player no longer carries old playlists into a newly selected station. Separate NEW CHANNEL and EDIT flows prevent accidental overwrites.
-- **Error 2** is reported as an invalid YouTube player request/identifier, not assumed to mean a private playlist. The official embed can still reject individual unlisted tracks; the **OPEN ON YOUTUBE** link plays the original shared playlist outside the dashboard.
+- **Error 2** is reported as an invalid YouTube player request/identifier, not assumed to mean a private playlist. If the normal YouTube playlist API returns error 2, the radio tries the official playlist embed parameters **once**, then shows an error and keeps the original copied share URL for **OPEN IN YOUTUBE MUSIC**. This is a compatibility attempt, not a guarantee of playback.
 - Does not download, extract, or stream YouTube audio independently. YouTube embeds are shown in a visible player. **Collapsing the radio pauses YouTube playback**; the playlist remains available after expanding.
 - Some private, blocked, age-restricted, geographic, or otherwise unembeddable playlists cannot play. Autoplay may require clicking the video player. YouTube Music Premium-specific features and private-account library syncing are **not supported**.
 - Local music files and direct HTTPS audio streams are separate sources; local file selections must be chosen again after restart.
@@ -27,7 +27,7 @@ There are **no EVE or Google account credentials required** for public market sc
 
 ## Visual livery preview
 
-We could not reliably retrieve the exact colors of the provided RSI organization site in the build environment, so the palettes are **design experiments**, not authenticated copies of the organization's logo or banner. Keep **4NIK8 Steel** as the draft default, or switch back to **Bandit Amber** while comparing. The v0.3 **Neon Freight** livery uses the colorful user-provided 4NIK8 banner image as a subtle masthead overlay with green, cyan, magenta, violet and orange accents. Palette switching remains available.
+We could not reliably retrieve the exact colors of the provided RSI organization site in the build environment, so the palettes are **design experiments**, not authenticated copies of the organization's logo or banner. **4NIK8 Neon Freight** is now the default on first install. Previously chosen liveries are respected across upgrades. The v0.3 **Neon Freight** livery uses the colorful user-provided 4NIK8 banner image as a subtle masthead overlay with green, cyan, magenta, violet and orange accents. Palette switching remains available.
 
 ## What the market preview actually does
 
@@ -73,3 +73,11 @@ EVE Online and YouTube are trademarks of their respective owners. This is an ind
 - Existing CB radio stations and preferences remain in `%LOCALAPPDATA%\4NIK8 ORE\Industrial Command\settings.json`. Updating the program folder does not overwrite this file.
 
 **Upgrade:** Stop the old server window, extract this ZIP into a new folder, then run `START_COMMAND.cmd`. If the old version stored radio channels only in browser storage, open the new release with the **same browser profile and address** on first launch to import them. Use the EXPORT SETTINGS button for an additional portable backup once the app opens.
+
+## v0.3.2 CB radio update
+
+- SHUFFLE on/off next to previous/play/next, using the official YouTube `setShuffle` command for embedded playlists. Applies again when changing channels.
+- Saves `radio.shuffle` as an optional boolean in the existing v1 AppData settings format; older settings files are still compatible.
+- Preserves full original YouTube Music share links when saving new channels, including query parameters, for the OPEN IN YOUTUBE MUSIC fallback.
+- Tries a second official embed initialization method on error 2. A particular YouTube Music playlist can still remain incompatible with embedding; the app does not bypass YouTube's playback restrictions.
+- Default theme remains 4NIK8 Neon Freight; previous manual livery selections remain saved.

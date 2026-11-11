@@ -15,4 +15,6 @@ for path in paths:
 assert "'/assets/4nik8-corp-emblem.png'='image/png'" in ps.decode('ascii')
 assert (root/'assets'/'4nik8-banner.webp').exists()
 assert 'settings.json' in ps.decode('ascii')
+assert 'shuffle=$shuffle' in ps.decode('ascii'), 'AppData settings host must persist radio shuffle'
+assert 'url=$savedUrl' in ps.decode('ascii'), 'Preserve the actual shared URL in AppData, not only the normalized playlist ID'
 print('PASS: PowerShell ASCII source and package assets')
