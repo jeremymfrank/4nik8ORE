@@ -90,10 +90,21 @@ with sync_playwright() as p:
  assert page.evaluate('window.fakeYT.opts.playerVars.list')==ID2
  page.evaluate('window.fakeYT.emitError(2)')
  assert 'YouTube rejected the embedded playlist request' in page.locator('#radioStatus').inner_text()
- assert 'sharing setting is wrong' in page.locator('#channelMessage').inner_text()
+ assert 'playback in the embedded player was rejected' in page.locator('#channelMessage').inner_text()
+ assert page.locator('#youtubeExternalFallback').is_visible()
+ assert page.locator('#youtubePlayerMount').is_hidden()
+ assert page.locator('#youtubeExternalFallbackLink').get_attribute('href')=='https://music.youtube.com/playlist?list='+ID2+'&si=share'
+ assert 'OPEN IN MUSIC' in page.locator('#channelList').inner_text()
+ assert 'ON AIR' not in page.locator('#channelList').inner_text()
+ # CB controls cannot control an externally playing playlist.
+ page.locator('#playPause').click()
+ assert 'cannot operate an external player' in page.locator('#radioStatus').inner_text()
  page.locator('[data-tune]').first.click()
  page.wait_for_function('window.fakeYT && window.fakeYT.last && window.fakeYT.last.list==="'+ID1+'"')
  assert page.evaluate('window.__playerInstances.length')==4
+ assert page.locator('#youtubeExternalFallback').is_hidden()
+ assert page.locator('#youtubePlayerMount').is_visible()
+ assert 'ON AIR' in page.locator('#channelList').inner_text()
  # Editing remains isolated; switching back/forth retains IDs.
  page.locator('[data-edit]').nth(0).click()
  page.locator('#channelName').fill('Scooter FM')

@@ -1,4 +1,4 @@
-# 4NIK8 ORE — Industrial Command (Preview v0.3.2)
+# 4NIK8 ORE — Industrial Command (Preview v0.3.3)
 
 **Local-only, single-user EVE Online mining-market prototype**, optimized for a **1080×1920 portrait side monitor**. Features the **CB ContraBand Radio** with saved YouTube Music / YouTube playlist channels.
 
@@ -81,3 +81,7 @@ EVE Online and YouTube are trademarks of their respective owners. This is an ind
 - Preserves full original YouTube Music share links when saving new channels, including query parameters, for the OPEN IN YOUTUBE MUSIC fallback.
 - Tries a second official embed initialization method on error 2. A particular YouTube Music playlist can still remain incompatible with embedding; the app does not bypass YouTube's playback restrictions.
 - Default theme remains 4NIK8 Neon Freight; previous manual livery selections remain saved.
+
+## Playlist embedding limitations (v0.3.3)
+
+YouTube Music share links can be playable on music.youtube.com even when YouTube's separate embedded IFrame Player rejects their playlist IDs. A shorter ID is not proof that the user copied the link incorrectly. The radio first tries the official `loadPlaylist` interface and then a single official playlist-embed compatibility attempt. If both fail, a proper **Play in YouTube Music** fallback replaces the broken iframe. The original shared URL and saved channel remain intact. Playback in the external YouTube Music tab is NOT controlled by the dashboard's shuffle/next/volume controls. The Jupiluxe playlist or other compatible embedded playlists continue to work as before. No scraping, stream extraction, copyright bypass, or invented ID rewriting is used.

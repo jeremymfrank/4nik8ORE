@@ -42,3 +42,5 @@ Never label market price as a guaranteed executable payout; never label a market
 - Playlist error 2 triggers at most one alternate official embed initialization. Do not retry indefinitely.
 - Store original validated music.youtube.com share URLs in AppData; preserve all user station presets and volume.
 - 4NIK8 Neon Freight is the first-install default; existing selected livery overrides the default.
+
+- v0.3.3: On failed embed, hide nonfunctional video, show original YouTube Music playlist link and external-control warning; keep saved channel and do not mark it ON AIR.

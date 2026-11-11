@@ -157,3 +157,13 @@ body{background:radial-gradient(ellipse at 58% 0%,#373023 0%,transparent 28%),re
 .player-controls .shuffle-toggle[aria-pressed="true"]{border-color:#7cf7d2;background:linear-gradient(135deg,#1d4648,#43295c);color:#a8fff1;box-shadow:0 0 12px #4af4d030,inset 0 0 7px #59ebae22}
 .player-controls .shuffle-toggle:focus-visible{outline:3px solid #ffd078;outline-offset:3px}
 @media(max-width:640px){.player-controls .shuffle-toggle{min-width:42px;padding:0 6px}.player-controls .shuffle-toggle span{display:none}}
+
+/* v0.3.3: A working YouTube Music share link can still be rejected by the iframe API. */
+.youtube-player-mount[hidden],.youtube-external-fallback[hidden]{display:none!important}
+.youtube-external-fallback{min-height:270px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px;text-align:center;background:radial-gradient(ellipse at 50% 20%,color-mix(in srgb,var(--amber) 12%,#071018),#090c0f 75%);border:1px solid var(--edge);border-radius:5px}
+.youtube-external-fallback .external-fallback-icon{font-size:34px;color:var(--amber)}
+.youtube-external-fallback strong{color:var(--text);font-size:19px}
+.youtube-external-fallback p{max-width:590px;margin:4px 0;color:var(--muted);font-size:13px;line-height:1.55}
+.youtube-external-fallback small{max-width:560px;color:var(--muted);font-size:11px;line-height:1.55}
+.external-fallback-launch{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--amber);border-radius:5px;background:var(--amber);color:#121518!important;font-weight:900;padding:14px 23px;text-decoration:none;min-height:45px;letter-spacing:.04em}
+.external-fallback-launch:hover{filter:brightness(1.12)}

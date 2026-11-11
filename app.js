@@ -8,7 +8,7 @@ const RESOURCES={
 const MARKETS={'10000043':'Amarr / Domain','10000002':'Jita / The Forge','10000030':'Rens / Heimatar','10000042':'Hek / Metropolis','10000032':'Dodixie / Sinq Laison','10000038':'The Bleak Lands','10000068':'Verge Vendor'};
 const CACHE_TTL=300000; const memCache=new Map();
 const state={resource:'ore',system:null,region:null,hub:10000043,results:[],selected:null,lastRun:0,inProgress:false,runId:0};
-const ua='4NIK8-Industrial-Command-Preview/0.3.2';
+const ua='4NIK8-Industrial-Command-Preview/0.3.3';
 const esi='https://esi.evetech.net/latest';
 function url(path){return esi+path+(path.includes('?')?'&':'?')+'datasource=tranquility&compatibility_date=2025-09-30&user_agent='+encodeURIComponent(ua);}
 function setStatus(status,detail){$('connectionBadge').className='conn-status '+status;$('connectionBadge').querySelector('span:last-child').textContent=detail;}
@@ -155,7 +155,7 @@ function radioInit(){
  const STORAGE='4nik8.cb.channels.v1', VOLUME_KEY='4nik8.cb.volume.v1', SHUFFLE_KEY='4nik8.cb.shuffle.v1';
  const maxChannels=40;
  let channels=[],editId=null,selectedChannelId=null;
- let source='none',audioIndex=-1,ytPlayer=null,ytReady=false,ytPlaying=false;
+ let source='none',audioIndex=-1,ytPlayer=null,ytReady=false,ytPlaying=false,ytEmbedFailed=false;
  let ytApiPromise=null,ytPlayerPromise=null,trackTitle='',tuneSequence=0;
  let shuffleEnabled=false,shuffleApplied=false;
  let localShuffleBag=[];
@@ -199,7 +199,8 @@ function radioInit(){
   $('channelCount').textContent=channels.length+' PRESET'+(channels.length===1?'':'S');
   $('channelList').innerHTML=channels.length?channels.map(c=>{
    const selected=c.id===selectedChannelId;
-   return `<div class="channel-preset ${selected?'active':''}"><button type="button" class="tune-channel" data-tune="${L.escape(c.id)}" aria-label="Tune channel ${L.escape(c.name)}"><span class="channel-badge">CH ${channelNumber(c.id)}</span><span class="channel-title">${L.escape(c.name)}</span><span class="channel-signal">${selected?'● ON AIR':'▸ TUNE'}</span></button><button type="button" class="channel-edit" data-edit="${L.escape(c.id)}" title="Edit ${L.escape(c.name)}" aria-label="Edit channel ${L.escape(c.name)}">✎</button><button type="button" class="channel-delete" data-delete="${L.escape(c.id)}" title="Delete ${L.escape(c.name)}" aria-label="Delete channel ${L.escape(c.name)}">×</button></div>`;
+   const signal=selected?(ytEmbedFailed?'↗ OPEN IN MUSIC':ytPlaying?'● ON AIR':ytReady?'Ⅱ PAUSED':'◌ TUNING'):'▸ TUNE';
+   return `<div class="channel-preset ${selected?'active':''}"><button type="button" class="tune-channel" data-tune="${L.escape(c.id)}" aria-label="Tune channel ${L.escape(c.name)}"><span class="channel-badge">CH ${channelNumber(c.id)}</span><span class="channel-title">${L.escape(c.name)}</span><span class="channel-signal">${signal}</span></button><button type="button" class="channel-edit" data-edit="${L.escape(c.id)}" title="Edit ${L.escape(c.name)}" aria-label="Edit channel ${L.escape(c.name)}">✎</button><button type="button" class="channel-delete" data-delete="${L.escape(c.id)}" title="Delete ${L.escape(c.name)}" aria-label="Delete channel ${L.escape(c.name)}">×</button></div>`;
   }).join(''):'<div class="channel-empty">No channels saved. Paste a shared YouTube Music playlist URL below.</div>';
   $('channelList').querySelectorAll('[data-tune]').forEach(b=>b.addEventListener('click',()=>tuneChannel(b.dataset.tune)));
   $('channelList').querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>{
@@ -248,7 +249,9 @@ function radioInit(){
   ++tuneSequence;
   if(ytPlayer&&typeof ytPlayer.destroy==='function'){try{ytPlayer.destroy();}catch(_){}}
   else if(ytPlayer&&typeof ytPlayer.stopVideo==='function'){try{ytPlayer.stopVideo();}catch(_){}}
-  ytPlayer=null;ytReady=false;ytPlaying=false;ytPlayerPromise=null;shuffleApplied=false;
+  ytPlayer=null;ytReady=false;ytPlaying=false;ytEmbedFailed=false;ytPlayerPromise=null;shuffleApplied=false;
+  $('youtubePlayerMount').hidden=false;
+  $('youtubeExternalFallback').hidden=true;
   $('youtubePlayerMount').replaceChildren();
  }
  function stopYouTube(){
@@ -290,6 +293,7 @@ function radioInit(){
   // Link back to the original music.youtube.com share URL. Never silently
   // substitute a made-up playlist URL when the user copied the correct link.
   $('youtubeExternal').href=requested.url;
+  $('youtubeExternalFallbackLink').href=requested.url;
   try {
    const YT=await ensureYouTubeApi();
    if(generation!==tuneSequence)return;
@@ -320,7 +324,7 @@ function radioInit(){
         // setShuffle does not persist across YouTube playlist loads.
         if(!shuffleApplied && (event.data===YT.PlayerState.PLAYING || event.data===5))applyYouTubeShuffle();
         try{trackTitle=event.target.getVideoData()?.title||'';}catch(_){trackTitle='';}
-        if(event.data===YT.PlayerState.PLAYING)status('Broadcasting CH '+channelNumber(id)+' from YouTube'+(shuffleEnabled?' · SHUFFLE ON':''));
+        if(event.data===YT.PlayerState.PLAYING){status('Broadcasting CH '+channelNumber(id)+' from YouTube'+(shuffleEnabled?' · SHUFFLE ON':''));renderChannels();}
         else if(event.data===YT.PlayerState.PAUSED)status('YouTube playback paused');
         else if(event.data===YT.PlayerState.BUFFERING)status('Tuning YouTube stream…');
         else if(event.data===YT.PlayerState.ENDED)status('Playlist ended.');
@@ -338,8 +342,19 @@ function radioInit(){
         setTimeout(()=>createPlayer('embed'),0);
         return;
        }
-       status('YouTube error '+event.data+': '+errorDescription(event.data)+' Open your original link in YouTube Music if needed.');
-       setChannelMessage('CH '+channelNumber(id)+' could not play inside the official embed. The saved shared link is still intact; this does not mean the sharing setting is wrong.',true);
+       ytEmbedFailed=true;ytPlaying=false;ytReady=false;trackTitle='';
+       // YouTube Music playback and YouTube's iframe embedding are separate services.
+       // A working share link is not necessarily supported by the embedded player.
+       // Do not label a rejected embed as broadcasting or leave a broken black iframe.
+       try{ytPlayer?.destroy?.();}catch(_){}
+       ytPlayer=null;
+       $('youtubePlayerMount').replaceChildren();
+       $('youtubePlayerMount').hidden=true;
+       $('youtubeExternalFallback').hidden=false;
+       $('youtubeExternalFallbackTitle').textContent=requested.name;
+       status('YouTube embed error '+event.data+': '+errorDescription(event.data)+' This is NOT a broken share link.');
+       setChannelMessage('CH '+channelNumber(id)+' is saved. YouTube Music can open the original link; playback in the embedded player was rejected. External playback uses YouTube Music controls.',true);
+       renderChannels();nowPlaying();
       }
      }
     });
@@ -379,6 +394,7 @@ function radioInit(){
  });
  $('playPause').addEventListener('click',async()=>{
   if(source==='youtube'){
+   if(ytEmbedFailed){status('This channel is available using PLAY IN YOUTUBE MUSIC; dashboard controls cannot operate an external player.');return;}
    if(!ytReady){status('YouTube is still connecting.');return;}
    try{if(ytPlaying)ytPlayer.pauseVideo();else ytPlayer.playVideo();}catch(e){status(e.message);}
    return;
