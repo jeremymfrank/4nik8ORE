@@ -58,6 +58,12 @@ with sync_playwright() as p:
  page.set_content(html,wait_until='domcontentloaded')
  page.wait_for_function("document.querySelector('#settingsStatus').textContent.includes('SAVED')")
  assert page.locator('#liverySelect').input_value()=='neon'
+ assert page.locator('.channel-preset').count()==1
+ assert 'Jupiluxe' in page.locator('#channelList').inner_text()
+ assert page.locator('#hubSelect').input_value()=='all'
+ assert page.locator('[data-resource=both]').get_attribute('aria-pressed')=='true'
+ assert page.locator('#youtubeExternal').count()==0
+ assert page.locator('#youtubeExternalFallback').count()==0
  assert page.locator('#shuffleButton').get_attribute('aria-pressed')=='false'
  page.locator('#shuffleButton').click()
  assert page.locator('#shuffleButton').get_attribute('aria-pressed')=='true'
@@ -66,8 +72,8 @@ with sync_playwright() as p:
  page.locator('#channelName').fill("Scooter's Roadhouse")
  page.locator('#channelUrl').fill('https://music.youtube.com/playlist?list='+ID1+'&si=share')
  page.locator('#saveChannel').click()
- assert page.locator('.channel-preset').count()==1
- page.locator('[data-tune]').first.click()
+ assert page.locator('.channel-preset').count()==2
+ page.locator('[data-tune]').nth(1).click()
  page.wait_for_function('window.fakeYT && window.fakeYT.last && window.fakeYT.last.list==="'+ID1+'"')
  assert page.locator('#youtubeShell').is_visible()
  assert 'Test track' in page.locator('#nowPlaying').inner_text()
@@ -77,45 +83,44 @@ with sync_playwright() as p:
  page.locator('#channelName').fill('Wormhole Country')
  page.locator('#channelUrl').fill('https://music.youtube.com/playlist?list='+ID2+'&si=share')
  page.locator('#saveChannel').click()
- assert page.locator('.channel-preset').count()==2
- page.locator('[data-tune]').nth(1).click()
+ assert page.locator('.channel-preset').count()==3
+ page.locator('[data-tune]').nth(2).click()
  page.wait_for_function('window.fakeYT && window.fakeYT.last && window.fakeYT.last.list==="'+ID2+'"')
  assert page.evaluate('window.__playerInstances[0].destroyed')
  assert page.evaluate('window.__playerInstances.length')==2
  assert page.evaluate('window.fakeYT.shuffleCalls')==[True]
- assert 'list='+ID2 in page.locator('#youtubeExternal').get_attribute('href')
+ assert page.locator('#youtubeExternal').count()==0
  page.evaluate('window.fakeYT.emitError(2)')
  page.wait_for_function('window.__playerInstances.length===3')
  assert page.evaluate('window.__playerInstances[1].destroyed')
  assert page.evaluate('window.fakeYT.opts.playerVars.list')==ID2
  page.evaluate('window.fakeYT.emitError(2)')
  assert 'YouTube rejected the embedded playlist request' in page.locator('#radioStatus').inner_text()
- assert 'playback in the embedded player was rejected' in page.locator('#channelMessage').inner_text()
- assert page.locator('#youtubeExternalFallback').is_visible()
- assert page.locator('#youtubePlayerMount').is_hidden()
- assert page.locator('#youtubeExternalFallbackLink').get_attribute('href')=='https://music.youtube.com/playlist?list='+ID2+'&si=share'
- assert 'OPEN IN MUSIC' in page.locator('#channelList').inner_text()
+ assert 'YouTube rejected the embedded request' in page.locator('#channelMessage').inner_text()
+ assert page.locator('#youtubePlayerMount').is_visible()
+ assert 'unavailable in the CB player' in page.locator('#youtubePlayerMount').inner_text()
+ assert 'TUNE FAILED' in page.locator('#channelList').inner_text()
  assert 'ON AIR' not in page.locator('#channelList').inner_text()
  # CB controls cannot control an externally playing playlist.
  page.locator('#playPause').click()
- assert 'cannot operate an external player' in page.locator('#radioStatus').inner_text()
- page.locator('[data-tune]').first.click()
+ assert 'Choose another channel' in page.locator('#radioStatus').inner_text()
+ page.locator('[data-tune]').nth(1).click()
  page.wait_for_function('window.fakeYT && window.fakeYT.last && window.fakeYT.last.list==="'+ID1+'"')
  assert page.evaluate('window.__playerInstances.length')==4
- assert page.locator('#youtubeExternalFallback').is_hidden()
+ assert page.locator('#youtubeExternalFallback').count()==0
  assert page.locator('#youtubePlayerMount').is_visible()
  assert 'ON AIR' in page.locator('#channelList').inner_text()
  # Editing remains isolated; switching back/forth retains IDs.
- page.locator('[data-edit]').nth(0).click()
+ page.locator('[data-edit]').nth(1).click()
  page.locator('#channelName').fill('Scooter FM')
  page.locator('#saveChannel').click()
- assert page.locator('.channel-preset').count()==2
+ assert page.locator('.channel-preset').count()==3
  assert 'Scooter FM' in page.locator('#channelList').inner_text()
  assert 'Wormhole Country' in page.locator('#channelList').inner_text()
  page.locator('#radioVolume').fill('45')
  assert page.evaluate('window.fakeYT.volume')==45
  # Debounced persistence goes to a simulated AppData server, not just browser cache.
- page.wait_for_function('window.__diskSettings && window.__diskSettings.radio.channels.length===2 && window.__diskSettings.radio.volume===45',timeout=5000)
+ page.wait_for_function('window.__diskSettings && window.__diskSettings.radio.channels.length===3 && window.__diskSettings.radio.volume===45',timeout=5000)
  assert page.evaluate('window.__diskSettings.livery')=='oxide'
  assert page.evaluate('window.__diskSettings.radio.shuffle') is True
  page.locator('#radioCollapse').click()
@@ -125,18 +130,19 @@ with sync_playwright() as p:
  # Restart with local browser storage deliberately cleared: disk copy restores it.
  page.evaluate('window.__store={}')
  page.set_content(html,wait_until='domcontentloaded')
- page.wait_for_function("document.querySelectorAll('.channel-preset').length===2")
+ page.wait_for_function("document.querySelectorAll('.channel-preset').length===3")
  assert page.locator('#radioVolume').input_value()=='45'
  assert page.locator('#liverySelect').input_value()=='oxide'
  assert page.locator('#shuffleButton').get_attribute('aria-pressed')=='true'
  assert 'Scooter FM' in page.locator('#channelList').inner_text()
+ assert 'Jupiluxe' in page.locator('#channelList').inner_text() # existing AppData channel was not duplicated
  # Export settings is a real, user-initiated download.
  with page.expect_download() as item:
   page.locator('#exportSettings').click()
  assert item.value.suggested_filename=='4nik8-industrial-command-settings.json'
  page.once('dialog',lambda d:d.accept())
- page.locator('[data-delete]').nth(1).click()
- assert page.locator('.channel-preset').count()==1
+ page.locator('[data-delete]').nth(2).click()
+ assert page.locator('.channel-preset').count()==2
  page.locator('#channelName').fill('Wrong Domain')
  page.locator('#channelUrl').fill('https://example.com/?list='+ID1)
  page.locator('#saveChannel').click()
@@ -145,6 +151,15 @@ with sync_playwright() as p:
  page.locator('#shuffleButton').click()
  assert page.locator('#shuffleButton').get_attribute('aria-pressed')=='false'
  page.wait_for_function('window.__diskSettings.radio.shuffle===false',timeout=5000)
+ # A deliberately deleted factory station must stay deleted, even after restart.
+ page.once('dialog',lambda d:d.accept())
+ page.locator('[data-delete]').first.click()
+ page.wait_for_function('window.__diskSettings.radio.channels.length===1',timeout=5000)
+ page.evaluate('window.__store={}')
+ page.set_content(html,wait_until='domcontentloaded')
+ page.wait_for_function("document.querySelectorAll('.channel-preset').length===1")
+ assert 'Jupiluxe' not in page.locator('#channelList').inner_text()
+ assert 'Scooter FM' in page.locator('#channelList').inner_text()
  assert not errors, errors
- print('PASS: shuffled playlists, switching/reapply, error-2 fallback, settings migration, editing, export, portrait neon default.')
+ print('PASS: factory Jupiluxe, shuffle, channel switching, no external fallback, settings migration, editing, export, portrait neon default.')
  browser.close()

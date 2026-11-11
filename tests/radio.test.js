@@ -16,3 +16,19 @@ assert.throws(()=>parse('https://example.com/playlist?list='+id),/Only shared Yo
 assert.throws(()=>parse('http://music.youtube.com/playlist?list='+id),/HTTPS/);
 assert.throws(()=>parse('https://music.youtube.com/playlist?list=LM'),/No usable playlist ID/);
 console.log('Playlist link normalization: 9 passing assertions');
+
+// Cross-region scanner must never combine distinct buyer stations into a fictitious sale.
+const orders=[
+ {is_buy_order:true,location_id:60000001,system_id:30000001,price:100,volume_remain:3,min_volume:1},
+ {is_buy_order:true,location_id:60000002,system_id:30000002,price:500,volume_remain:3,min_volume:1},
+ {is_buy_order:true,location_id:60000001,system_id:30000001,price:90,volume_remain:5,min_volume:1},
+];
+const quotes=context.ICLogic.rankStationQuotesAll(orders,8,2);
+assert.equal(quotes[0].locationId,60000001);
+assert.equal(quotes[0].gross,3*100+5*90);
+assert.equal(quotes[0].full,true);
+assert.equal(quotes[0].systemId,30000001);
+assert.equal(quotes[1].full,false);
+assert.equal(quotes[1].gross,3*500);
+assert.equal(context.ICLogic.rankStationQuotes(orders,8,2).locationId,60000001);
+console.log('Cross-regional station-depth ranking: passing');

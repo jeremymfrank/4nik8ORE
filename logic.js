@@ -1,7 +1,7 @@
 (function(global){
 'use strict';
 const api={};
-api.rankStationQuotes=function(orders,units,rawVolume){
+api.rankStationQuotesAll=function(orders,units,rawVolume){
   const grouped=new Map();
   for(const o of orders||[]){
     if(!o.is_buy_order || !Number.isFinite(+o.price) || +o.price<=0 || !o.location_id || +o.volume_remain<=0)continue;
@@ -20,10 +20,11 @@ api.rankStationQuotes=function(orders,units,rawVolume){
       if(remaining===0)break;
     }
     const filled=units-remaining;
-    if(filled>0)quotes.push({locationId,filled,units,coverage:filled/units,gross,perM3:gross/(units*rawVolume),pricePerFilledM3:gross/(filled*rawVolume),full:remaining===0});
+    if(filled>0)quotes.push({locationId,systemId:stationOrders[0]?.system_id||null,filled,units,coverage:filled/units,gross,perM3:gross/(units*rawVolume),pricePerFilledM3:gross/(filled*rawVolume),full:remaining===0});
   }
-  return quotes.sort((a,b)=>(Number(b.full)-Number(a.full))||b.gross-a.gross)[0]||null;
+  return quotes.sort((a,b)=>(Number(b.full)-Number(a.full))||b.gross-a.gross);
 };
+api.rankStationQuotes=function(orders,units,rawVolume){return api.rankStationQuotesAll(orders,units,rawVolume)[0]||null;};
 api.bestOpportunity=function(variants){
   const valid=(variants||[]).filter(v=>v.quote);
   valid.sort((a,b)=>Number(b.quote.full)-Number(a.quote.full)||b.quote.gross-a.quote.gross);

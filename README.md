@@ -1,4 +1,4 @@
-# 4NIK8 ORE — Industrial Command (Preview v0.3.3)
+# 4NIK8 ORE — Industrial Command (Preview v0.4.0)
 
 **Local-only, single-user EVE Online mining-market prototype**, optimized for a **1080×1920 portrait side monitor**. Features the **CB ContraBand Radio** with saved YouTube Music / YouTube playlist channels.
 
@@ -6,7 +6,7 @@
 
 1. Extract the ZIP into a folder on your Windows PC.
 2. Double-click **`START_COMMAND.cmd`**. Close the old launcher window before starting a new release. It launches a loopback-only Windows PowerShell HTTP server and opens the dashboard at `http://127.0.0.1:48148/`. Keep the launcher window open while using the app. No administrator rights required.
-3. Select an EVE system, public comparison market, resource type, and sample mining volume, then select **SCAN MARKETS**.
+3. Select an EVE operating system, automatic cross-region coverage, ore/ice resources, and sample mining volume, then select **SCAN MARKETS**.
 4. Open **CB ContraBand Radio**. Paste a shared **YouTube Music** or **YouTube** playlist link, provide a channel name, and click **SAVE CB CHANNEL**.
 5. Use **NEW CHANNEL** before adding an additional preset. Click a saved channel's **TUNE** button to load the playlist using the **official visible YouTube IFrame Player API**. Use the player and dashboard transport/volume controls.
 6. Try **TRUCK LIVERY** in the upper right to switch among **4NIK8 Neon Freight**, **Bandit Amber**, **4NIK8 Steel**, and **Salvage Oxide**.
@@ -15,11 +15,11 @@ There are **no EVE or Google account credentials required** for public market sc
 
 ## CB ContraBand Radio details
 
-- Save up to 40 locally named playlist presets; rename, delete, tune, skip, pause, adjust playback volume, and **toggle SHUFFLE**. The shuffle preference is stored alongside your stations in Windows AppData and is reapplied when you tune a new YouTube playlist. Local file tracks shuffle as well.
+- First install includes **CH 01 Jupiluxe** (a saved YouTube Music playlist link, not audio files). Existing AppData presets are preserved; Jupiluxe is only seeded for an empty fresh installation and is not resurrected after deletion. Save up to 40 locally named playlist presets; rename, delete, tune, skip, pause, adjust playback volume, and **toggle SHUFFLE**. The shuffle preference is stored alongside your stations in Windows AppData and is reapplied when you tune a new YouTube playlist. Local file tracks shuffle as well.
 - Accepts `https://music.youtube.com/playlist?list=...`, `https://www.youtube.com/playlist?list=...`, and YouTube Music shared `watch?...&list=...` or `/browse/VL...` URLs.
 - Saved channels, volume, livery and scanner preferences are written to **`%LOCALAPPDATA%\4NIK8 ORE\Industrial Command\settings.json`**, independent of the ZIP extraction folder. Browser `localStorage` remains as a fallback; first v0.3 launch migrates presets from v0.2. **`settings.json.bak`** is maintained on updates. The local server now retains the original verified YouTube Music share URLs and shuffle state when saving settings. **EXPORT SETTINGS** downloads a JSON backup; **IMPORT SETTINGS** restores one. Install updates by extracting the next build and closing the old local server first.
 - **Second-channel bug fix:** Each TUNE initializes a fresh YouTube iframe. The player no longer carries old playlists into a newly selected station. Separate NEW CHANNEL and EDIT flows prevent accidental overwrites.
-- **Error 2** is reported as an invalid YouTube player request/identifier, not assumed to mean a private playlist. If the normal YouTube playlist API returns error 2, the radio tries the official playlist embed parameters **once**, then shows an error and keeps the original copied share URL for **OPEN IN YOUTUBE MUSIC**. This is a compatibility attempt, not a guarantee of playback.
+- **Error 2** is reported as an invalid YouTube player request/identifier, not assumed to mean a private playlist. If YouTube returns error 2, the radio tries the official alternative playlist embed once, then shows an in-radio error if embedding fails. There is no external YouTube playback button or workaround.
 - Does not download, extract, or stream YouTube audio independently. YouTube embeds are shown in a visible player. **Collapsing the radio pauses YouTube playback**; the playlist remains available after expanding.
 - Some private, blocked, age-restricted, geographic, or otherwise unembeddable playlists cannot play. Autoplay may require clicking the video player. YouTube Music Premium-specific features and private-account library syncing are **not supported**.
 - Local music files and direct HTTPS audio streams are separate sources; local file selections must be chosen again after restart.
@@ -33,18 +33,18 @@ We could not reliably retrieve the exact colors of the provided RSI organization
 
 - Resolves the entered system and security rating from CCP ESI.
 - Resolves a curated subset of raw and compressed ore/ice item names and volumes.
-- Fetches **public regional buy orders** for the operating region and chosen hub region, respecting a short client-side cache.
+- Fetches **public regional buy orders** for the operating region (when available) and all five major trade regions automatically, respecting the five-minute ESI market cache. A local-only toggle is available.
 - Ranks gross price per mined cubic meter using **single-station order depth** and marks partially covered loads.
-- Lets you request a safer stargate route to public NPC buyer stations (changed route request to GET after the observed ESI 405; requires live verification).
+- Automatically requests a safer stargate route to the selected quoted buyer system (2026 CCP POST route API; real ESI connectivity still needs Windows testing). Also lists alternative public buyer stations from the same scan.
 - Keeps all calculations, playlist presets, and user settings on the local PC/browser (no hosted application account).
 
 ## Important limitations
 
-- Gross ISK/m³ is **not** net ISK or actual ISK/hour. No mining-yield model, taxes, reprocessing, shipping costs, fuel, risk or time estimates are included yet.
+- Cross-region quotes are **not** proof a resource is currently available in the operating system. Gross ISK/m³ is **not** net ISK or actual ISK/hour. No mining-yield model, taxes, reprocessing, shipping costs, fuel, risk or time estimates are included yet.
 - **Market demand does not prove there is an ore or ice anomaly** in the selected system; live sites are not discoverable from ESI.
 - Wormhole systems can be entered, but current wormhole exits are not automatically known.
 - Private Upwell structure markets and some null-sec buybacks require legitimately authorized access not present in this build.
-- Regional buy orders may have range conditions; a quoted buyer does not guarantee that a load can be sold from every station in the system. Verify the destination in-game.
+- Public trade-region names indicate the region searched, **not** a guarantee that the quote is at the named hub station (e.g. Jita). Each displayed buyer station is taken from the actual order. Regional buy orders may have range conditions; a quoted buyer does not guarantee that a load can be sold from every station in the system. Verify the destination in-game.
 - Cached market quotes are snapshots, not guaranteed trades; public ESI market orders normally have a five-minute cache period.
 - The loopback server launches only on `127.0.0.1`; other computers on your network cannot reach it. It serves only the four whitelisted app files plus HTML, with no folder traversal or data uploading.
 - A native Windows installer, SQLite snapshots, resilient ESI refreshes, backup/export and optional account-based data can come later.
@@ -64,24 +64,16 @@ We could not reliably retrieve the exact colors of the provided RSI organization
 
 EVE Online and YouTube are trademarks of their respective owners. This is an independent 4NIK8 fan application, not an official CCP or Google product.
 
-## v0.3.1 hotfix (Windows PowerShell 5.1)
+## Historical fixes retained
 
-- Fixed startup error `The string is missing the terminator: "` by using a strictly ASCII PowerShell launcher. The v0.3 source had a Unicode em dash without a BOM, which Windows PowerShell 5.1 could misinterpret as a closing quotation mark.
-- Uses explicitly constructed `TcpListener` and UTF-8 encoder objects, compatible with Windows PowerShell 5.1.
-- Includes the new in-game 4NIK8 corporation emblem, extracted from the user-provided screenshot, in the header.
-- Includes all referenced static assets in the release ZIP.
-- Existing CB radio stations and preferences remain in `%LOCALAPPDATA%\4NIK8 ORE\Industrial Command\settings.json`. Updating the program folder does not overwrite this file.
+- PowerShell 5.1 ASCII-safe loopback server launcher, with persistent AppData settings.
+- Fresh YouTube IFrame Player for every channel switch, saved shuffle and volume preferences, and official single alternate embed retry for error 2.
+- Settings export/import, local backup, and the default Neon Freight paint job. The original shared URL is still retained inside the channel record for editing and exports, **not** for an external playback button.
 
-**Upgrade:** Stop the old server window, extract this ZIP into a new folder, then run `START_COMMAND.cmd`. If the old version stored radio channels only in browser storage, open the new release with the **same browser profile and address** on first launch to import them. Use the EXPORT SETTINGS button for an additional portable backup once the app opens.
+## v0.4 focus
 
-## v0.3.2 CB radio update
-
-- SHUFFLE on/off next to previous/play/next, using the official YouTube `setShuffle` command for embedded playlists. Applies again when changing channels.
-- Saves `radio.shuffle` as an optional boolean in the existing v1 AppData settings format; older settings files are still compatible.
-- Preserves full original YouTube Music share links when saving new channels, including query parameters, for the OPEN IN YOUTUBE MUSIC fallback.
-- Tries a second official embed initialization method on error 2. A particular YouTube Music playlist can still remain incompatible with embedding; the app does not bypass YouTube's playback restrictions.
-- Default theme remains 4NIK8 Neon Freight; previous manual livery selections remain saved.
-
-## Playlist embedding limitations (v0.3.3)
-
-YouTube Music share links can be playable on music.youtube.com even when YouTube's separate embedded IFrame Player rejects their playlist IDs. A shorter ID is not proof that the user copied the link incorrectly. The radio first tries the official `loadPlaylist` interface and then a single official playlist-embed compatibility attempt. If both fail, a proper **Play in YouTube Music** fallback replaces the broken iframe. The original shared URL and saved channel remain intact. Playback in the external YouTube Music tab is NOT controlled by the dashboard's shuffle/next/volume controls. The Jupiluxe playlist or other compatible embedded playlists continue to work as before. No scraping, stream extraction, copyright bypass, or invented ID rewriting is used.
+- **One scan:** automatic five public hub regions plus the operating region, ore and ice, raw and compressed forms. Local-only comparison remains optional.
+- **One destination decision:** at each resource, display the top actual buyer station, quoted order depth, gross executable revenue, alternatives, and an automatic ESI stargate route when supported. Quotes from separate locations are never combined.
+- **No claimed mining-location discovery yet:** ESI does not publish live deposits or wormhole exits, and static eligibility per system has not yet been indexed. Determining where a deposit really exists remains future work.
+- **Factory radio:** Jupiluxe preset ships in the code with its user-provided playlist URL. It does not ship music files or alter existing user settings.
+- **No external player UI:** playlists only use the embedded official YouTube player.

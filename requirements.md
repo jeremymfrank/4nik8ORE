@@ -44,3 +44,10 @@ Never label market price as a guaranteed executable payout; never label a market
 - 4NIK8 Neon Freight is the first-install default; existing selected livery overrides the default.
 
 - v0.3.3: On failed embed, hide nonfunctional video, show original YouTube Music playlist link and external-control warning; keep saved channel and do not mark it ON AIR.
+
+## v0.4
+- Factory radio preset Jupiluxe on fresh empty install only; never overwrite existing settings.
+- Remove external YouTube Music fallback UI and buttons.
+- One scan covers major public trading regions plus operating region; list actual single-station depth and gross value for each item, with trade-region alternatives.
+- Auto route via CCP documented POST where stargate routes exist; no route estimates for unknown wormhole exits.
+- Mining-site presence, private structure markets, net profit and genuine ISK/hour are not available in v0.4.

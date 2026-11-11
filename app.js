@@ -5,10 +5,12 @@ const RESOURCES={
  ore:['Pyroxeres','Omber III-Grade','Kernite','Dark Ochre','Gneiss','Crokite'],
  ice:['Clear Icicle','White Glaze','Blue Ice','Glacial Mass']
 };
-const MARKETS={'10000043':'Amarr / Domain','10000002':'Jita / The Forge','10000030':'Rens / Heimatar','10000042':'Hek / Metropolis','10000032':'Dodixie / Sinq Laison','10000038':'The Bleak Lands','10000068':'Verge Vendor'};
+const MARKETS={'10000043':'Domain (Amarr)','10000002':'The Forge (Jita)','10000030':'Heimatar (Rens)','10000042':'Metropolis (Hek)','10000032':'Sinq Laison (Dodixie)','10000038':'The Bleak Lands','10000068':'Verge Vendor'};
+const MAJOR_MARKET_REGIONS=[10000043,10000002,10000030,10000042,10000032];
+const FACTORY_JUPILUXE=Object.freeze({id:'factory-jupiluxe-v1',name:'Jupiluxe',url:'https://music.youtube.com/playlist?list=PLPvpJjBd_h4nG9C1K-nLrGWsdre_8kX9V',playlistId:'PLPvpJjBd_h4nG9C1K-nLrGWsdre_8kX9V'});
 const CACHE_TTL=300000; const memCache=new Map();
-const state={resource:'ore',system:null,region:null,hub:10000043,results:[],selected:null,lastRun:0,inProgress:false,runId:0};
-const ua='4NIK8-Industrial-Command-Preview/0.3.3';
+const state={resource:'both',system:null,region:null,hub:'all',results:[],selected:null,lastRun:0,inProgress:false,runId:0,coverage:[],failed:0,routeToken:0};
+const ua='4NIK8-Industrial-Command-Preview/0.4.0';
 const esi='https://esi.evetech.net/latest';
 function url(path){return esi+path+(path.includes('?')?'&':'?')+'datasource=tranquility&compatibility_date=2025-09-30&user_agent='+encodeURIComponent(ua);}
 function setStatus(status,detail){$('connectionBadge').className='conn-status '+status;$('connectionBadge').querySelector('span:last-child').textContent=detail;}
@@ -16,7 +18,7 @@ function message(t){$('locationSummary').textContent=t;}
 function bestPriceDisplay(n){return L.formatIsk(n,1);}
 async function request(path,opts={},ttl=CACHE_TTL,force=false){
  const k=path+(opts.body||''); const cached=memCache.get(k);
- if(!force&&cached&&Date.now()-cached.at<ttl)return cached.value;
+ if((!force || path.startsWith('/markets/'))&&cached&&Date.now()-cached.at<ttl)return cached.value;
  const ctrl=new AbortController(), timeout=setTimeout(()=>ctrl.abort(),18000);
  try{
   const r=await fetch(url(path),{method:opts.method||'GET',body:opts.body,headers:opts.body?{'Content-Type':'application/json'}:undefined,signal:ctrl.signal});
@@ -34,7 +36,7 @@ async function findSystem(name,force){
  return {id:found.id,name:sys.name||name,security:sys.security_status,regionId:constellation.region_id,regionName:region.name};
 }
 async function loadResources(resource,force){
- const names=RESOURCES[resource], all=names.concat(names.map(n=>'Compressed '+n));
+ const names=resource==='both'?[...RESOURCES.ore,...RESOURCES.ice]:RESOURCES[resource], all=names.concat(names.map(n=>'Compressed '+n));
  const found=await resolveNames(all,force);
  const types=Object.fromEntries((found.inventory_types||[]).map(t=>[t.name,t.id]));
  const map=[];
@@ -56,32 +58,37 @@ async function pool(work,limit,onComplete){
    }
  });await Promise.all(workers);
 }
-function buildTasks(types,regionId,hubId,force){
- const jobs=[];for(const t of types){if(!t.id||!t.volume)continue;
-   for(const form of ['raw','compressed']){
-    const typeId=form==='raw'?t.id:t.compressedId;if(!typeId)continue;
-    for(const region of new Set([regionId,hubId])){
-     jobs.push({name:t.name,form,region,typeId,job:()=>request('/markets/'+region+'/orders/?order_type=buy&type_id='+typeId,{},CACHE_TTL,force)});
-    }
+function scanRegions(regionId,coverage){
+ const localMarket=regionId>=10000000 && regionId<11000000 ? [regionId] : [];
+ return [...new Set(coverage==='local'?localMarket:[...localMarket,...MAJOR_MARKET_REGIONS])];
+}
+function buildTasks(types,regions,force){
+ const jobs=[];
+ for(const t of types){if(!t.id||!t.volume)continue;
+  for(const form of ['raw','compressed']){
+   const typeId=form==='raw'?t.id:t.compressedId;if(!typeId)continue;
+   for(const region of regions){
+    jobs.push({name:t.name,form,region,typeId,job:()=>request('/markets/'+region+'/orders/?order_type=buy&type_id='+typeId,{},CACHE_TTL,force)});
    }
+  }
  }
  return jobs;
 }
-function assembleRows(types,payload,sys,hub){
- const volume=Math.max(1,+$('cargoVolume').value||31625);
- const result=[];
+function assembleRows(types,payload,regions){
+ const volume=Math.max(1,+$('cargoVolume').value||31625),result=[];
  for(const item of types){
   if(item.error){result.push({...item,error:item.error});continue;}
-  const units=Math.max(1,Math.floor(volume/item.volume));
-  const variants=[];
-  for(const form of ['raw','compressed'])for(const reg of new Set([sys.regionId,hub])){
+  const units=Math.max(1,Math.floor(volume/item.volume)),variants=[];
+  for(const form of ['raw','compressed'])for(const reg of regions){
    const key=item.name+'|'+form+'|'+reg,orders=payload.get(key);
    if(!orders)continue;
-   const quote=L.rankStationQuotes(orders,units,item.volume);
-   if(quote)variants.push({form,region:reg,quote});
+   const quotes=L.rankStationQuotesAll(orders,units,item.volume);
+   // Compare the best *station*, not a synthetic region-wide buyer.
+   for(const quote of quotes.slice(0,3))variants.push({form,region:reg,quote});
   }
   const winner=L.bestOpportunity(variants);
-  result.push({...item,units,volume:units*item.volume,winner,variants});
+  const alternatives=variants.sort((a,b)=>Number(b.quote.full)-Number(a.quote.full)||b.quote.gross-a.quote.gross);
+  result.push({...item,units,volume:units*item.volume,winner,variants:alternatives});
  }
  result.sort((a,b)=>Number(!!b.winner)-Number(!!a.winner)||(Number(b.winner?.quote.full||false)-Number(a.winner?.quote.full||false))||(b.winner?.quote.perM3||0)-(a.winner?.quote.perM3||0));
  return result;
@@ -94,7 +101,7 @@ function drawRows(){
   if(!item.winner)return `<div class="op-card"><div class="rank">·</div><div class="op-main"><div class="op-name">${L.escape(item.name)}</div><div class="op-sub">${L.escape(item.error||'No executable public buy orders found for this sample load')}</div></div><div class="op-price"><strong>—</strong></div></div>`;
   ranking++;
   const w=item.winner, full=w.quote.full, mark=w.form==='compressed'?'COMPRESSED':'RAW';
-  return `<div class="op-card ${state.selected===item.name?'selected':''}" data-item="${L.escape(item.name)}" role="button" tabindex="0" aria-label="Inspect ${L.escape(item.name)}"><div class="rank">${ranking}</div><div class="op-main"><div class="op-name">${L.escape(item.name)}</div><div class="op-sub">${mark} · ${L.escape(w.region===state.system.regionId?state.system.regionName:MARKETS[w.region]||'Other region')}${full?' · FULL LOAD':' · PARTIAL '+Math.round(w.quote.coverage*100)+'%'}</div></div><div class="op-price"><strong class="${full?'':'limited'}">${bestPriceDisplay(w.quote.perM3)}</strong><small>ISK/m³ · gross</small></div></div>`;
+  return `<div class="op-card ${state.selected===item.name?'selected':''}" data-item="${L.escape(item.name)}" role="button" tabindex="0" aria-label="Inspect ${L.escape(item.name)}"><div class="rank">${ranking}</div><div class="op-main"><div class="op-name">${L.escape(item.name)}</div><div class="op-sub">${mark} · ${L.escape(MARKETS[w.region]||state.system.regionName||'Other region')}${full?' · FULL LOAD':' · PARTIAL '+Math.round(w.quote.coverage*100)+'%'}</div></div><div class="op-price"><strong class="${full?'':'limited'}">${bestPriceDisplay(w.quote.perM3)}</strong><small>ISK/m³ · gross</small></div></div>`;
  }).join('');
  el.querySelectorAll('[data-item]').forEach(node=>{const callback=()=>selectItem(node.dataset.item);node.addEventListener('click',callback);node.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();callback();}});});
  const leader=state.results.find(x=>x.winner);
@@ -104,7 +111,7 @@ function drawRows(){
 async function runScan(force=false){
  if(state.inProgress)return;
  const systemName=$('systemInput').value.trim();if(!systemName)return;
- state.inProgress=true;const current=++state.runId;state.results=[];state.selected=null;state.hub=+$('hubSelect').value;
+ state.inProgress=true;const current=++state.runId;state.results=[];state.selected=null;state.hub=$('hubSelect').value;state.failed=0;state.routeToken++;
  $('scanButton').disabled=true;$('refreshButton').disabled=true;setStatus('','CONNECTING');
  $('opportunities').innerHTML='<div class="placeholder"><span class="reticle">◎</span><strong>SEARCHING NEW EDEN</strong><p>Resolving location and resource types through ESI…</p></div>';
  $('bestName').textContent='Scanning orders…';$('bestPrice').textContent='—';
@@ -113,20 +120,22 @@ async function runScan(force=false){
   const sys=await findSystem(systemName,force);state.system=sys;
   message(`${sys.name} · ${sys.security==null?'Unknown':Number(sys.security).toFixed(2)} security · ${sys.regionName} · ${Number(sys.id)>=31000000&&Number(sys.id)<32000000?'Wormhole system':'Known-space system'}`);
   const resources=await loadResources(state.resource,force);
-  const tasks=buildTasks(resources,sys.regionId,state.hub,force);
+  const regions=scanRegions(sys.regionId,state.hub);state.coverage=regions;
+  if(!regions.length)throw Error('No public regional market is available here. Use ALL PUBLIC HUB REGIONS for wormhole operations.');
+  const tasks=buildTasks(resources,regions,force);
   const payload=new Map();let done=0,fail=0;
   $('opportunities').innerHTML='<div class="placeholder"><span class="reticle">◎</span><strong>FETCHING LIVE BUY ORDERS</strong><p id="loadProgress">0 / '+tasks.length+' requests · public markets</p></div>';
-  await pool(tasks.map(t=>t.job),3,(idx,data,error)=>{
+  await pool(tasks.map(t=>t.job),5,(idx,data,error)=>{
    const job=tasks[idx];if(!error)payload.set(job.name+'|'+job.form+'|'+job.region,data);
    else fail++;
    done++;const progress=$('loadProgress');if(progress)progress.textContent=done+' / '+tasks.length+' market requests'+(fail?' · '+fail+' failed':'');
   });
   if(current!==state.runId)return;
   if(!payload.size)throw Error('No ESI market queries succeeded. Check network access or retry later.');
-  state.results=assembleRows(resources,payload,sys,state.hub);state.lastRun=Date.now();drawRows();
+  state.failed=fail;state.results=assembleRows(resources,payload,regions);state.lastRun=Date.now();drawRows();
   const first=state.results.find(x=>x.winner);if(first)selectItem(first.name);
-  setStatus('online','ESI ORDERS LOADED');
-  $('dataFootnote').textContent+=' · Retrieved '+new Date(state.lastRun).toLocaleString()+(fail?' · '+fail+' market requests failed.':'');
+  setStatus('online',fail?'PARTIAL MARKET DATA':'CROSS-REGION ORDERS LOADED');
+  $('dataFootnote').textContent+=' · '+regions.length+' public regions scanned · Retrieved '+new Date(state.lastRun).toLocaleString()+(fail?' · WARNING: '+fail+' market requests failed.':'');
   $('refreshButton').disabled=false;
  }catch(error){
   setStatus('error','ESI UNAVAILABLE');message('Error: '+error.message);
@@ -136,19 +145,26 @@ async function runScan(force=false){
 }
 function selectItem(name){
  const item=state.results.find(x=>x.name===name);if(!item?.winner)return;state.selected=item.name;drawRows();
- const w=item.winner,q=w.quote,regionName=w.region===state.system.regionId?state.system.regionName:MARKETS[w.region]||'Other region';
- $('haulDetails').innerHTML=`<div class="detail-row"><span>Material</span><strong>${L.escape(item.name)}</strong></div><div class="detail-row"><span>Sell as</span><strong>${w.form==='raw'?'Raw ore / ice':'Compressed ore / ice'}</strong></div><div class="detail-row"><span>Best public market region</span><strong>${L.escape(regionName)}</strong></div><div class="detail-row"><span>Target load</span><strong>${L.formatIsk(item.volume,1)} m³ / ${L.formatIsk(item.units)} units</strong></div><div class="detail-row"><span>Buyer demand at one location</span><strong>${L.formatIsk(q.filled)} / ${L.formatIsk(q.units)} units</strong></div><div class="detail-row"><span>Gross immediate-sale value</span><strong>${L.formatIsk(q.gross)} ISK</strong></div><div class="detail-row"><span>Buyer station ID</span><strong>${q.locationId}</strong></div><button class="route-btn" id="routeButton">CALCULATE SAFER ROUTE TO BUYER</button><p class="muted tiny" id="routeResult">No shipping cost or tax is assumed. Buy orders may change before arrival. ESI market locations are not automatically safe or accessible.</p>`;
- $('routeButton').addEventListener('click',()=>routeToBuyer(q.locationId));
+ const w=item.winner,q=w.quote,regionName=MARKETS[w.region]||state.system.regionName||'Other region';
+ const alternatives=item.variants.filter(v=>v!==w && v.quote.locationId!==q.locationId).slice(0,3);
+ $('haulDetails').innerHTML=`<div class="detail-row"><span>Resource evaluated</span><strong>${L.escape(item.name)}</strong></div><div class="detail-row"><span>Best public buy-order region</span><strong>${L.escape(regionName)}</strong></div><div class="detail-row"><span>Sale form</span><strong>${w.form==='raw'?'Raw':'Compressed'}</strong></div><div class="detail-row"><span>Sample mined volume</span><strong>${L.formatIsk(item.volume,1)} m³ / ${L.formatIsk(item.units)} units</strong></div><div class="detail-row"><span>Purchasable at quoted station</span><strong>${L.formatIsk(q.filled)} / ${L.formatIsk(q.units)} units</strong></div><div class="detail-row"><span>Gross buyer revenue</span><strong>${L.formatIsk(q.gross)} ISK</strong></div><div class="detail-row"><span>Buyer location</span><strong>${L.escape(String(q.locationId))}</strong></div><div class="detail-row"><span>Route from ${L.escape(state.system.name)}</span><strong id="routeResult">Resolving automatically…</strong></div><div class="market-alternatives"><strong>OTHER QUOTED BUYERS · SAME SCAN</strong>${alternatives.length?alternatives.map(v=>`<div class="alternate-row"><span>${L.escape(MARKETS[v.region]||'Operating region')} · ${v.form.toUpperCase()} · ${L.escape(String(v.quote.locationId))}</span><strong>${L.formatIsk(v.quote.gross)} ISK${v.quote.full?'':' · PARTIAL'}</strong></div>`).join(''):'<span class="muted tiny">No other public station quote found.</span>'}</div><p class="muted tiny">Single-station buy-order depth. Gross revenue only: no processing fees, tax, hauling cost, risk or travel time. Market site availability is unverified.</p>`;
+ const token=++state.routeToken;
+ autoRouteToBuyer(q,token);
 }
-async function routeToBuyer(stationId){
- const label=$('routeResult'),button=$('routeButton');label.textContent='Checking station and route…';button.disabled=true;
+async function autoRouteToBuyer(quote,token){
+ const label=$('routeResult');if(!label)return;
+ const isWH=state.system.id>=31000000&&state.system.id<32000000;
+ if(isWH){label.textContent='Wormhole exits unknown · cannot calculate';return;}
+ if(!quote.systemId){label.textContent='Buyer system not reported by market order';return;}
  try{
-  if(stationId>=1000000000000)throw Error('This appears to be a player structure; public station details may not be available.');
-  const station=await request('/universe/stations/'+stationId+'/',{},86400000);
-  const route=await request('/route/'+state.system.id+'/'+station.system_id+'/?flag=secure',{},86400000);
-  if(!Array.isArray(route))throw Error('Invalid route response.');
-  label.innerHTML=`<strong>${L.escape(station.name)}</strong> · ${Math.max(0,route.length-1)} jumps by safer route. Verify risk in-game before hauling; wormhole connections are not included automatically.`;
- }catch(e){label.textContent='Route unavailable: '+e.message;}finally{button.disabled=false;}
+  // 2026 CCP route API uses POST with preference/security_penalty in JSON body.
+  const body=JSON.stringify({preference:'Safer',security_penalty:50});
+  const result=await request('/route/'+state.system.id+'/'+quote.systemId+'/',{method:'POST',body},86400000);
+  if(token!==state.routeToken||!label.isConnected)return;
+  const route=Array.isArray(result)?result:Array.isArray(result.path)?result.path:null;
+  if(!route)throw Error('unexpected route response');
+  label.textContent=Math.max(0,route.length-1)+' stargate jumps (safer preference) · excludes wormholes/filaments/jump drives';
+ }catch(e){if(token===state.routeToken&&label.isConnected)label.textContent='Route unavailable: '+e.message;}
 }
 function radioInit(){
  const audio=$('audioPlayer');
@@ -199,7 +215,7 @@ function radioInit(){
   $('channelCount').textContent=channels.length+' PRESET'+(channels.length===1?'':'S');
   $('channelList').innerHTML=channels.length?channels.map(c=>{
    const selected=c.id===selectedChannelId;
-   const signal=selected?(ytEmbedFailed?'↗ OPEN IN MUSIC':ytPlaying?'● ON AIR':ytReady?'Ⅱ PAUSED':'◌ TUNING'):'▸ TUNE';
+   const signal=selected?(ytEmbedFailed?'⚠ TUNE FAILED':ytPlaying?'● ON AIR':ytReady?'Ⅱ PAUSED':'◌ TUNING'):'▸ TUNE';
    return `<div class="channel-preset ${selected?'active':''}"><button type="button" class="tune-channel" data-tune="${L.escape(c.id)}" aria-label="Tune channel ${L.escape(c.name)}"><span class="channel-badge">CH ${channelNumber(c.id)}</span><span class="channel-title">${L.escape(c.name)}</span><span class="channel-signal">${signal}</span></button><button type="button" class="channel-edit" data-edit="${L.escape(c.id)}" title="Edit ${L.escape(c.name)}" aria-label="Edit channel ${L.escape(c.name)}">✎</button><button type="button" class="channel-delete" data-delete="${L.escape(c.id)}" title="Delete ${L.escape(c.name)}" aria-label="Delete channel ${L.escape(c.name)}">×</button></div>`;
   }).join(''):'<div class="channel-empty">No channels saved. Paste a shared YouTube Music playlist URL below.</div>';
   $('channelList').querySelectorAll('[data-tune]').forEach(b=>b.addEventListener('click',()=>tuneChannel(b.dataset.tune)));
@@ -251,7 +267,6 @@ function radioInit(){
   else if(ytPlayer&&typeof ytPlayer.stopVideo==='function'){try{ytPlayer.stopVideo();}catch(_){}}
   ytPlayer=null;ytReady=false;ytPlaying=false;ytEmbedFailed=false;ytPlayerPromise=null;shuffleApplied=false;
   $('youtubePlayerMount').hidden=false;
-  $('youtubeExternalFallback').hidden=true;
   $('youtubePlayerMount').replaceChildren();
  }
  function stopYouTube(){
@@ -290,10 +305,7 @@ function radioInit(){
   settingsManager.schedule();
   $('radioContent').hidden=false;$('radioCollapse').textContent='▾';$('radioCollapse').setAttribute('aria-expanded','true');
   $('youtubeShell').hidden=false;renderChannels();nowPlaying();status('Tuning CH '+channelNumber(id)+'…');
-  // Link back to the original music.youtube.com share URL. Never silently
-  // substitute a made-up playlist URL when the user copied the correct link.
-  $('youtubeExternal').href=requested.url;
-  $('youtubeExternalFallbackLink').href=requested.url;
+  // Play only in the integrated official YouTube player; no external launch fallback.
   try {
    const YT=await ensureYouTubeApi();
    if(generation!==tuneSequence)return;
@@ -349,11 +361,11 @@ function radioInit(){
        try{ytPlayer?.destroy?.();}catch(_){}
        ytPlayer=null;
        $('youtubePlayerMount').replaceChildren();
-       $('youtubePlayerMount').hidden=true;
-       $('youtubeExternalFallback').hidden=false;
-       $('youtubeExternalFallbackTitle').textContent=requested.name;
-       status('YouTube embed error '+event.data+': '+errorDescription(event.data)+' This is NOT a broken share link.');
-       setChannelMessage('CH '+channelNumber(id)+' is saved. YouTube Music can open the original link; playback in the embedded player was rejected. External playback uses YouTube Music controls.',true);
+       const err=document.createElement('div');err.className='embedded-radio-error';
+       err.textContent='CH '+channelNumber(id)+' unavailable in the CB player (YouTube error '+event.data+'). Preset remains saved; try another station.';
+       $('youtubePlayerMount').appendChild(err);
+       status('YouTube embed error '+event.data+': '+errorDescription(event.data));
+       setChannelMessage('CH '+channelNumber(id)+' remains saved. YouTube rejected the embedded request; CB did not start playback.',true);
        renderChannels();nowPlaying();
       }
      }
@@ -394,7 +406,7 @@ function radioInit(){
  });
  $('playPause').addEventListener('click',async()=>{
   if(source==='youtube'){
-   if(ytEmbedFailed){status('This channel is available using PLAY IN YOUTUBE MUSIC; dashboard controls cannot operate an external player.');return;}
+   if(ytEmbedFailed){status('YouTube rejected this station inside CB ContraBand Radio. Choose another channel.');return;}
    if(!ytReady){status('YouTube is still connecting.');return;}
    try{if(ytPlaying)ytPlayer.pauseVideo();else ytPlayer.playVideo();}catch(e){status(e.message);}
    return;
@@ -458,7 +470,7 @@ const settingsManager=(()=>{
   if(typeof scan.system==='string'&&scan.system)$('systemInput').value=scan.system;
   if(typeof scan.hub==='string'&&[...$('hubSelect').options].some(x=>x.value===scan.hub))$('hubSelect').value=scan.hub;
   if(Number.isFinite(+scan.cargo)&&+scan.cargo>0)$('cargoVolume').value=+scan.cargo;
-  if(['ore','ice'].includes(scan.resource)){
+   if(['ore','ice','both'].includes(scan.resource)){
    state.resource=scan.resource;
    document.querySelectorAll('[data-resource]').forEach(b=>{const yes=b.dataset.resource===scan.resource;b.classList.toggle('active',yes);b.setAttribute('aria-pressed',String(yes));});
   }
@@ -489,8 +501,14 @@ const settingsManager=(()=>{
     const merged=structuredClone(disk);
     if(additions.length)merged.radio.channels=[...merged.radio.channels,...additions].slice(0,40);
     apply(merged);notify('WINDOWS SETTINGS RESTORED');
-   }else {apply(browser);notify('BROWSER CHANNELS MIGRATED TO WINDOWS');}
-  }catch(_){notify('BROWSER SETTINGS ONLY · WINDOWS HOST UNAVAILABLE');}
+    }else {
+      if(!browser.radio.channels.length)browser.radio.channels=[{...FACTORY_JUPILUXE}];
+      apply(browser);notify('BROWSER CHANNELS MIGRATED TO WINDOWS');
+    }
+  }catch(_){
+    if(!browser.radio.channels.length){browser.radio.channels=[{...FACTORY_JUPILUXE}];apply(browser);}
+    notify('BROWSER SETTINGS ONLY · WINDOWS HOST UNAVAILABLE');
+  }
   started=true;await save();
  }
  function download(){

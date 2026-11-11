@@ -21,10 +21,10 @@
         <form id="scanForm">
           <div class="field-row">
             <label class="field grow" for="systemInput"><span>OPERATING SYSTEM</span><input id="systemInput" value="Gammel" list="systemExamples" required autocomplete="off" spellcheck="false"><datalist id="systemExamples"><option value="Gammel"><option value="Sosala"><option value="Anka"><option value="Masalle"><option value="Jita"><option value="J123456"></datalist></label>
-            <label class="field market-field" for="hubSelect"><span>COMPARE MARKET</span><select id="hubSelect"><option value="10000043">Amarr / Domain</option><option value="10000002">Jita / The Forge</option><option value="10000030">Rens / Heimatar</option><option value="10000042">Hek / Metropolis</option><option value="10000032">Dodixie / Sinq Laison</option><option value="10000038">The Bleak Lands</option><option value="10000068">Verge Vendor</option></select></label>
+            <label class="field market-field" for="hubSelect"><span>MARKET COVERAGE</span><select id="hubSelect"><option value="all">AUTO · ALL MAJOR HUB REGIONS + LOCAL</option><option value="local">OPERATING REGION ONLY</option></select></label>
           </div>
           <div class="config-row">
-            <div class="segmented" role="group" aria-label="Resource group"><button type="button" class="segment active" data-resource="ore" aria-pressed="true">ORE</button><button type="button" class="segment" data-resource="ice" aria-pressed="false">ICE</button></div>
+            <div class="segmented" role="group" aria-label="Resource group"><button type="button" class="segment active" data-resource="both" aria-pressed="true">ORE + ICE</button><button type="button" class="segment" data-resource="ore" aria-pressed="false">ORE</button><button type="button" class="segment" data-resource="ice" aria-pressed="false">ICE</button></div>
             <label class="field load-field" for="cargoVolume"><span>LOAD TO PRICE · m³</span><input type="number" id="cargoVolume" min="1" max="10000000" step="1" value="31625"></label>
           </div>
           <div class="scan-actions"><button id="scanButton" class="primary" type="submit"><span aria-hidden="true">◎</span> SCAN MARKETS</button><button id="refreshButton" type="button" class="ghost" title="Refresh cached market data" disabled>↻ REFRESH</button></div>
@@ -34,9 +34,9 @@
       <section class="profit panel">
         <div class="section-name"><span class="ordinal">02</span> OPPORTUNITY BOARD <span class="line"></span><span class="small-label">ORDER BOOK / ISK·M³</span></div>
         <div class="headline"><div><div class="muted smallcaps">BEST QUOTED OPPORTUNITY</div><div class="headline-name" id="bestName">Awaiting live data</div></div><div class="headline-value"><span id="bestPrice">—</span><small>ISK / mined m³</small></div></div>
-        <div class="notice" id="notice" role="status">Market value is not proof an ore or ice site currently exists. Local system anomalies and wormhole connections are not publicly broadcast via ESI.</div>
+        <div class="notice" id="notice" role="status">Market profitability is NOT proof a deposit exists in your selected system. This scanner compares possible resources with public buyers across major regions; site availability, logistics costs and actual ISK/hour remain unknown.</div>
         <div class="sort-strip"><span>RESOURCE / FORM</span><span>BEST REGIONAL BUY ORDERS</span></div>
-        <div id="opportunities" class="opportunity-list"><div class="placeholder"><span class="reticle">◎</span><strong>READY FOR DEPARTURE</strong><p>Choose your operating system and run a market scan. Official ESI quotes will appear here.</p></div></div>
+        <div id="opportunities" class="opportunity-list"><div class="placeholder"><span class="reticle">◎</span><strong>READY FOR DEPARTURE</strong><p>Choose an operating system and scan all major public trading regions in one pass.</p></div></div>
         <div class="footer-note" id="dataFootnote">No estimated or invented price data is shown.</div>
       </section>
       <section class="detail panel">
@@ -59,23 +59,16 @@
             </form>
           </div>
           <div class="youtube-shell" id="youtubeShell" hidden>
-            <div class="youtube-shell-header"><strong>CH <span id="youtubeChannelNumber">19</span> · OFFICIAL YOUTUBE PLAYER</strong><div class="youtube-links"><a id="youtubeExternal" target="_blank" rel="noopener noreferrer" href="https://www.youtube.com/">OPEN IN YOUTUBE MUSIC ↗</a><button type="button" id="stopYouTube">■ OFF AIR</button></div></div>
+            <div class="youtube-shell-header"><strong>CH <span id="youtubeChannelNumber">19</span> · OFFICIAL YOUTUBE PLAYER</strong><button type="button" id="stopYouTube">■ OFF AIR</button></div>
             <div id="youtubePlayerMount" class="youtube-player-mount"></div>
-            <div id="youtubeExternalFallback" class="youtube-external-fallback" role="status" hidden>
-              <div class="external-fallback-icon" aria-hidden="true">↗</div>
-              <strong id="youtubeExternalFallbackTitle">Saved channel</strong>
-              <p>The playlist opens in YouTube Music, but YouTube rejected playback through its separate embedded-player API. Your station and shared URL are still saved.</p>
-              <a id="youtubeExternalFallbackLink" class="external-fallback-launch" href="https://music.youtube.com/" target="_blank" rel="noopener noreferrer">▶ PLAY IN YOUTUBE MUSIC ↗</a>
-              <small>External playback has its own play, next, shuffle and volume controls. CB's in-app controls apply to successfully embedded channels only.</small>
-            </div>
-            <p class="youtube-hint">The YouTube player stays visible. Unlisted shared playlists may work, but individual tracks can still block embedding. If YouTube rejects the embedded player, use OPEN IN YOUTUBE MUSIC.</p>
+            <p class="youtube-hint">Playback stays in the visible integrated YouTube player. Some shared playlists may be rejected by YouTube embedding; stations remain saved when a request fails.</p>
           </div>
           <div class="radio-inputs"><div class="source-label">OTHER SOURCES · LOCAL FILES &amp; INTERNET RADIO</div><label class="file-picker" for="audioFiles">+ ADD LOCAL MUSIC</label><input id="audioFiles" class="sr-only" type="file" multiple accept="audio/*"><div class="stream-row"><input id="streamUrl" type="url" placeholder="Internet radio stream URL (https://…)" aria-label="Internet radio URL"><button id="playStream" title="Play radio stream">TUNE IN</button></div></div>
           <div id="playlist" class="playlist"></div>
           <audio id="audioPlayer" preload="none"></audio>
         </div>
       </section>
-      <footer class="bottom"><span>4NIK8 ORE / INDUSTRIAL RECLAMATION</span><span class="version">PREVIEW v0.3.3 · LOCAL WINDOWS</span></footer>
+      <footer class="bottom"><span>4NIK8 ORE / INDUSTRIAL RECLAMATION</span><span class="version">PREVIEW v0.4.0 · LOCAL WINDOWS</span></footer>
     </main>
   </div>
   <script src="logic.js"></script>
