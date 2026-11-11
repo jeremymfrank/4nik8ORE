@@ -1,54 +1,63 @@
-# 4NIK8 ORE — Industrial Command (Preview v0.1.0)
+# 4NIK8 ORE — Industrial Command (Preview v0.2.0)
 
-This is a **local-only, single-user, 1080×1920 portrait-optimized first prototype**, not a finished Windows installer.
+**Local-only, single-user EVE Online mining-market prototype**, optimized for a **1080×1920 portrait side monitor**. Features the **CB ContraBand Radio** with saved YouTube Music / YouTube playlist channels.
 
 ## Start on Windows
 
-1. Extract the ZIP into a permanent folder on your Windows PC.
-2. Double-click **index.html** to open it in Microsoft Edge or Google Chrome.
-3. Choose a real EVE Online system (Gammel, Sosala, Jita, or a J-system), then select a comparison market.
-4. Select **ORE** or **ICE** and click **SCAN MARKETS**.
-5. Click an opportunity to inspect public buy-order depth and calculate a safer route to its buyer station.
-6. Expand the **CB ContraBand Radio** panel to load local audio files or tune in to a direct HTTPS radio-stream URL. Browser playback may require clicking Play.
+1. Extract the ZIP into a folder on your Windows PC.
+2. Double-click **`START_COMMAND.cmd`**. It launches a loopback-only Windows PowerShell HTTP server and opens the dashboard at `http://127.0.0.1:48148/`. Keep the launcher window open while using the app. No administrator rights required.
+3. Select an EVE system, public comparison market, resource type, and sample mining volume, then select **SCAN MARKETS**.
+4. Open **CB ContraBand Radio**. Paste a shared **YouTube Music** or **YouTube** playlist link, provide a channel name, and click **SAVE CB CHANNEL**.
+5. Click the saved channel's **TUNE** button to load the playlist using the **official visible YouTube IFrame Player API**. Use the player and dashboard transport/volume controls.
+6. Try **TRUCK LIVERY** in the upper right to switch among **Bandit Amber**, **4NIK8 Steel (draft)**, and **Salvage Oxide (draft)**.
 
-No installation, server, VPN, EVE password, or API key is required in this preview.
+There are **no EVE or Google account credentials required** for public market scanning or shared playlist links. The local dashboard does need internet access to load ESI, public YouTube playlists, and streamed radio.
 
-## What the preview actually does
+## CB ContraBand Radio details
 
-- Resolves your entered system through CCP ESI.
-- Determines the system's region and security rating.
-- Resolves curated ore and ice item types and volumes from CCP ESI.
-- Fetches **public regional buy orders** for raw and compressed types in the operating region and selected comparison region.
-- Ranks buyers using actual order quantities and **single-station** buy-order depth for the sample load.
-- Displays a gross ISK/m³ value and marks partial liquidity.
-- Resolves an NPC buyer station and a safer stargate route on demand.
-- Provides a real local-audio/stream playback panel.
+- Save up to 40 locally named playlist presets; rename, delete, tune, skip, pause, and adjust playback volume.
+- Accepts `https://music.youtube.com/playlist?list=...`, `https://www.youtube.com/playlist?list=...`, and YouTube Music shared `watch?...&list=...` or `/browse/VL...` URLs.
+- Saved channels, volume, and livery are stored in **browser `localStorage`** under the **localhost** origin. Use the same browser/profile and launcher for persistence. Clearing site data will erase saved presets; a future build will add backup/export.
+- Does not download, extract, or stream YouTube audio independently. YouTube embeds are shown in a visible player. **Collapsing the radio pauses YouTube playback**; the playlist remains available after expanding.
+- Some private, blocked, age-restricted, geographic, or otherwise unembeddable playlists cannot play. Autoplay may require clicking the video player. YouTube Music Premium-specific features and private-account library syncing are **not supported**.
+- Local music files and direct HTTPS audio streams are separate sources; local file selections must be chosen again after restart.
+- YouTube requires a visible embedded player and an HTTP origin; opening `index.html` as `file://` is **not supported for playlist playback**. Always launch using the `.cmd` file.
+
+## Visual livery preview
+
+We could not reliably retrieve the exact colors of the provided RSI organization site in the build environment, so the palettes are **design experiments**, not authenticated copies of the organization's logo or banner. Keep **4NIK8 Steel** as the draft default, or switch back to **Bandit Amber** while comparing. A screenshot of the organization banner can be used to extract a precise palette in a later update.
+
+## What the market preview actually does
+
+- Resolves the entered system and security rating from CCP ESI.
+- Resolves a curated subset of raw and compressed ore/ice item names and volumes.
+- Fetches **public regional buy orders** for the operating region and chosen hub region, respecting a short client-side cache.
+- Ranks gross price per mined cubic meter using **single-station order depth** and marks partially covered loads.
+- Lets you request a safer stargate route to public NPC buyer stations.
+- Keeps all calculations, playlist presets, and user settings on the local PC/browser (no hosted application account).
 
 ## Important limitations
 
-- This is a functional **prototype**, not a complete mining-profitability model. ISK/m³ is **gross sale value**, not ISK/hour or net profit. No ship-yield model, taxes, reprocessing, loading time, fuel expense, or gank risk is included yet.
-- A **market opportunity does not prove the ore or ice is available** in the selected system. ESI has no public real-time anomaly scanner.
-- Wormhole system names are accepted, but wormhole connections and current exits are not published by ESI. Public market orders in a wormhole region may be unavailable.
-- No private Upwell structure market orders are included. Some null-sec markets need authenticated access.
-- An ESI market quote is a snapshot, not a guaranteed executable trade. Prices and order volumes can change, regional buy orders can be limited to particular locations, and seller travel remains necessary.
-- The app prioritizes a single station that can buy the sample amount, so it will not artificially aggregate prices from scattered buyer stations.
-- Loaded local audio files are not automatically reopened after closing the browser. This is a browser security restriction.
-- EVE APIs and internet radio require connectivity. The UI and code run locally.
-- If ESI is down or browser CORS prevents access, the app displays an explicit error and *never invents prices*.
-- Data is held temporarily in memory for the ESI cache interval; there is no permanent history database yet.
+- Gross ISK/m³ is **not** net ISK or actual ISK/hour. No mining-yield model, taxes, reprocessing, shipping costs, fuel, risk or time estimates are included yet.
+- **Market demand does not prove there is an ore or ice anomaly** in the selected system; live sites are not discoverable from ESI.
+- Wormhole systems can be entered, but current wormhole exits are not automatically known.
+- Private Upwell structure markets and some null-sec buybacks require legitimately authorized access not present in this build.
+- Regional buy orders may have range conditions; a quoted buyer does not guarantee that a load can be sold from every station in the system. Verify the destination in-game.
+- Cached market quotes are snapshots, not guaranteed trades; public ESI market orders normally have a five-minute cache period.
+- The loopback server launches only on `127.0.0.1`; other computers on your network cannot reach it. It serves only the four whitelisted app files plus HTML, with no folder traversal or data uploading.
+- A native Windows installer, SQLite snapshots, resilient ESI refreshes, backup/export and optional account-based data can come later.
 
-## Notes for the full Windows build
+## Verification
 
-The next engineering step is to put this UI behind a local ASP.NET Core/.NET 10 host with SQLite, a durable cache, EVE SSO with PKCE for optional read-only data, and a real Windows launcher. A host also avoids browser/file-origin limitations, allows robust scheduled refreshes, and protects any future tokens with Windows DPAPI.
+- `node --check app.js` and `node --check logic.js` (syntax).
+- `node tests/radio.test.js` validates playlist URL normalization and rejection of unsupported URLs.
+- `python tests/browser_test.py` runs an **offline, mocked YouTube player UI test** in Chromium/Playwright covering saves, tuning, transport controls, volume, collapse, persistence, edits, deletion, URL rejection, and livery changes. This does **not** verify actual playback on YouTube or live ESI connectivity.
 
-Initial deployment should be **Windows, local only, one user, portrait screen**. Multiuser and VPN come later if the corporation wants them.
-
-## Sources
+## Official references
 
 - [CCP ESI documentation](https://developers.eveonline.com/docs/services/esi/overview/)
-- [CCP ESI best practices](https://developers.eveonline.com/docs/services/esi/best-practices/)
-- [CCP market endpoint rate limiting](https://developers.eveonline.com/blog/market-orders-rate-limit-rolls-out-on-february-24-2026)
-- [CCP route API update](https://developers.eveonline.com/blog/route-to-the-future-upgrading-the-route-route)
-- [CCP static data](https://developers.eveonline.com/docs/services/static-data/)
+- [CCP API market rate limits](https://developers.eveonline.com/blog/market-orders-rate-limit-rolls-out-on-february-24-2026)
+- [YouTube embedded player requirements](https://developers.google.com/youtube/player_parameters)
+- [YouTube IFrame Player API](https://developers.google.com/youtube/iframe_api_reference)
 
-EVE Online is a trademark of CCP hf. This is an independent fan-created proof of concept, not an official CCP product.
+EVE Online and YouTube are trademarks of their respective owners. This is an independent 4NIK8 fan application, not an official CCP or Google product.

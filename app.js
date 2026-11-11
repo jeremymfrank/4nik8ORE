@@ -8,7 +8,7 @@ const RESOURCES={
 const MARKETS={'10000043':'Amarr / Domain','10000002':'Jita / The Forge','10000030':'Rens / Heimatar','10000042':'Hek / Metropolis','10000032':'Dodixie / Sinq Laison','10000038':'The Bleak Lands','10000068':'Verge Vendor'};
 const CACHE_TTL=300000; const memCache=new Map();
 const state={resource:'ore',system:null,region:null,hub:10000043,results:[],selected:null,lastRun:0,inProgress:false,runId:0};
-const ua='4NIK8-Industrial-Command-Preview/0.1.1';
+const ua='4NIK8-Industrial-Command-Preview/0.2.0';
 const esi='https://esi.evetech.net/latest';
 function url(path){return esi+path+(path.includes('?')?'&':'?')+'datasource=tranquility&compatibility_date=2025-09-30&user_agent='+encodeURIComponent(ua);}
 function setStatus(status,detail){$('connectionBadge').className='conn-status '+status;$('connectionBadge').querySelector('span:last-child').textContent=detail;}
@@ -151,41 +151,207 @@ async function routeToBuyer(stationId){
  }catch(e){label.textContent='Route unavailable: '+e.message;}finally{button.disabled=false;}
 }
 function radioInit(){
- const a=$('audioPlayer');a.volume=.55;const playlist=[];let index=-1,sourceType='';
- function current(){return playlist[index];}
- function render(){
-  $('playPause').textContent=a.paused?'▶':'❚❚';
-  $('nowPlaying').textContent=current()?.name||'NO SIGNAL · SELECT AUDIO';
-  $('radioStatus').textContent=a.error?'Audio source not playable in this browser':a.paused?'Paused / standby':'Broadcasting to the cab';
-  $('playlist').innerHTML=playlist.map((t,i)=>`<button class="${i===index?'active':''}" data-index="${i}">CH ${String(i+1).padStart(2,'0')} · ${L.escape(t.name)}</button>`).join('');
-  $('playlist').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>play(+b.dataset.index)));
+ const audio=$('audioPlayer');
+ const STORAGE='4nik8.cb.channels.v1', VOLUME_KEY='4nik8.cb.volume.v1';
+ const maxChannels=40;
+ let channels=[],editId=null,selectedChannelId=null;
+ let source='none',audioIndex=-1,ytPlayer=null,ytReady=false,ytPlaying=false;
+ let ytApiPromise=null,ytPlayerPromise=null,trackTitle='';
+ const audioTracks=[];
+ const volumeInput=$('radioVolume');
+ try{
+  const stored=JSON.parse(localStorage.getItem(STORAGE)||'[]');
+  if(Array.isArray(stored))channels=stored.slice(0,maxChannels).filter(c=>{
+   if(!c||typeof c.name!=='string'||typeof c.url!=='string')return false;
+   try{c.playlistId=L.parseYouTubePlaylistUrl(c.url).playlistId;return true;}catch(_){return false;}
+  }).map(c=>({id:String(c.id||''),name:c.name.slice(0,48),url:c.url,playlistId:c.playlistId})).filter(c=>c.id);
+ }catch(_){channels=[];}
+ try{const v=+localStorage.getItem(VOLUME_KEY);if(Number.isFinite(v)&&v>=0&&v<=100)volumeInput.value=v;}catch(_){}
+ audio.volume=+volumeInput.value/100;$('volumeValue').textContent=volumeInput.value;
+ function persist(){try{localStorage.setItem(STORAGE,JSON.stringify(channels));return true;}catch(e){setChannelMessage('Presets could not be saved in browser storage: '+e.message,true);return false;}}
+ function setChannelMessage(msg,isError=false){$('channelMessage').textContent=msg;$('channelMessage').classList.toggle('error',isError);}
+ function channel(){return channels.find(c=>c.id===selectedChannelId)||null;}
+ function channelNumber(id){const i=channels.findIndex(c=>c.id===id);return String(i+1).padStart(2,'0');}
+ function renderChannels(){
+  $('channelCount').textContent=channels.length+' PRESET'+(channels.length===1?'':'S');
+  $('channelList').innerHTML=channels.length?channels.map(c=>{
+   const selected=c.id===selectedChannelId;
+   return `<div class="channel-preset ${selected?'active':''}"><button type="button" class="tune-channel" data-tune="${L.escape(c.id)}" aria-label="Tune channel ${L.escape(c.name)}"><span class="channel-badge">CH ${channelNumber(c.id)}</span><span class="channel-title">${L.escape(c.name)}</span><span class="channel-signal">${selected?'● ON AIR':'▸ TUNE'}</span></button><button type="button" class="channel-edit" data-edit="${L.escape(c.id)}" title="Edit ${L.escape(c.name)}" aria-label="Edit channel ${L.escape(c.name)}">✎</button><button type="button" class="channel-delete" data-delete="${L.escape(c.id)}" title="Delete ${L.escape(c.name)}" aria-label="Delete channel ${L.escape(c.name)}">×</button></div>`;
+  }).join(''):'<div class="channel-empty">No channels saved. Paste a shared YouTube Music playlist URL below.</div>';
+  $('channelList').querySelectorAll('[data-tune]').forEach(b=>b.addEventListener('click',()=>tuneChannel(b.dataset.tune)));
+  $('channelList').querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>{
+   const c=channels.find(c=>c.id===b.dataset.edit);if(!c)return;
+   editId=c.id;$('channelName').value=c.name;$('channelUrl').value=c.url;
+   $('saveChannel').textContent='SAVE CHANNEL CHANGES';$('cancelChannelEdit').hidden=false;
+   setChannelMessage('Editing CH '+channelNumber(c.id)+'. Your changes are saved locally.');
+   $('channelName').focus();
+  }));
+  $('channelList').querySelectorAll('[data-delete]').forEach(b=>b.addEventListener('click',()=>{
+   const c=channels.find(c=>c.id===b.dataset.delete);if(!c)return;
+   if(!window.confirm('Delete CB channel "'+c.name+'"?'))return;
+   channels=channels.filter(x=>x.id!==c.id);
+   if(selectedChannelId===c.id)stopYouTube();
+   if(editId===c.id)cancelEdit();
+   persist();renderChannels();setChannelMessage('Deleted channel '+c.name+'.');
+  }));
  }
- async function play(i){
-  if(!playlist.length)return;
-  index=(i+playlist.length)%playlist.length;const t=current();
-  a.src=t.url;a.load();render();try{await a.play();}catch(e){$('radioStatus').textContent='Playback blocked or unsupported: '+e.message;}
-  render();
+ function cancelEdit(){editId=null;$('channelForm').reset();$('saveChannel').textContent='+ SAVE CB CHANNEL';$('cancelChannelEdit').hidden=true;}
+ $('cancelChannelEdit').addEventListener('click',()=>{cancelEdit();setChannelMessage('Ready to save another playlist.');});
+ $('channelForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  const name=$('channelName').value.trim(),input=$('channelUrl').value.trim();
+  if(!name){setChannelMessage('Give this channel a name.',true);return;}
+  let parsed;try{parsed=L.parseYouTubePlaylistUrl(input);}catch(err){setChannelMessage(err.message,true);return;}
+  if(!editId&&channels.length>=maxChannels){setChannelMessage('Maximum '+maxChannels+' saved channels reached.',true);return;}
+  const saved={id:editId||String(Date.now())+'-'+Math.random().toString(36).slice(2,10),name:name.slice(0,48),url:parsed.canonicalUrl,playlistId:parsed.playlistId};
+  if(editId){const index=channels.findIndex(c=>c.id===editId);if(index>=0)channels[index]=saved;else channels.push(saved);}else channels.push(saved);
+  const wasActive=selectedChannelId===saved.id;
+  persist();cancelEdit();renderChannels();
+  setChannelMessage('Saved "'+saved.name+'" as CH '+channelNumber(saved.id)+'. Click TUNE to play.');
+  if(wasActive)tuneChannel(saved.id);
+ });
+ function status(s){$('radioStatus').textContent=s;}
+ function nowPlaying(){
+  const ch=channel();
+  if(source==='youtube'&&ch){$('nowPlaying').textContent=ch.name+(trackTitle?' · '+trackTitle:'');$('youtubeChannelNumber').textContent=channelNumber(ch.id);}
+  else if(source==='audio'&&audioTracks[audioIndex])$('nowPlaying').textContent=audioTracks[audioIndex].name;
+  else $('nowPlaying').textContent='NO SIGNAL · SELECT AUDIO';
+  $('playPause').textContent=source==='youtube'?(ytPlaying?'❚❚':'▶'):(source==='audio'&&!audio.paused?'❚❚':'▶');
+ }
+ function stopYouTube(){
+  if(ytPlayer&&ytReady&&typeof ytPlayer.stopVideo==='function'){try{ytPlayer.stopVideo();}catch(_){}}
+  selectedChannelId=null;ytPlaying=false;trackTitle='';$('youtubeShell').hidden=true;
+  if(source==='youtube')source='none';
+  renderChannels();nowPlaying();
+ }
+ $('stopYouTube').addEventListener('click',()=>{stopYouTube();status('YouTube channel off air.');});
+ function ensureYouTubeApi(){
+  if(window.YT&&window.YT.Player)return Promise.resolve(window.YT);
+  if(ytApiPromise)return ytApiPromise;
+  ytApiPromise=new Promise((resolve,reject)=>{
+   const script=document.createElement('script');
+   window.onYouTubeIframeAPIReady=()=>resolve(window.YT);
+   script.src='https://www.youtube.com/iframe_api';script.async=true;
+   script.onerror=()=>reject(Error('Cannot reach YouTube player API. Check your network connection.'));
+   document.head.appendChild(script);
+  }).catch(e=>{ytApiPromise=null;throw e;});
+  return ytApiPromise;
+ }
+ function ensurePlayer(){
+  if(ytPlayerPromise)return ytPlayerPromise;
+  ytPlayerPromise=ensureYouTubeApi().then(YT=>new Promise((resolve,reject)=>{
+   // Keep the official video player visible; audio-only hidden YouTube embedding is not supported.
+   const timer=setTimeout(()=>reject(Error('YouTube player did not initialize.')),18000);
+   ytPlayer=new YT.Player('youtubePlayerMount',{
+    width:'100%',height:'100%',playerVars:{playsinline:1,controls:1,rel:0,origin:window.location.origin},
+    events:{
+     onReady(event){clearTimeout(timer);ytReady=true;event.target.setVolume(+volumeInput.value);resolve(event.target);},
+     onStateChange(event){
+      ytPlaying=event.data===YT.PlayerState.PLAYING;
+      if(source==='youtube'){
+       try{trackTitle=event.target.getVideoData()?.title||'';}catch(_){trackTitle='';}
+       if(event.data===YT.PlayerState.PLAYING)status('Broadcasting from YouTube · playlist supplied by user');
+       else if(event.data===YT.PlayerState.PAUSED)status('YouTube playback paused');
+       else if(event.data===YT.PlayerState.BUFFERING)status('Tuning YouTube stream…');
+       else if(event.data===YT.PlayerState.ENDED)status('Playlist ended.');
+       nowPlaying();
+      }
+     },
+     onError(event){if(source==='youtube')status('YouTube error '+event.data+': playlist may be private, restricted, or not embeddable. Try opening it on YouTube.');}
+    }
+   });
+  })).catch(e=>{ytPlayerPromise=null;throw e;});
+  return ytPlayerPromise;
+ }
+ async function tuneChannel(id){
+  const requested=channels.find(c=>c.id===id);if(!requested)return;
+  // A saved playlist is not necessarily playable: YouTube decides embed eligibility.
+  if(location.protocol==='file:'){
+   setChannelMessage('To play YouTube channels, launch the app with START_COMMAND.cmd (localhost required for YouTube embeds).',true);
+   return;
+  }
+  audio.pause();source='youtube';selectedChannelId=id;trackTitle='';ytPlaying=false;
+  $('radioContent').hidden=false;$('radioCollapse').textContent='▾';$('radioCollapse').setAttribute('aria-expanded','true');
+  $('youtubeShell').hidden=false;renderChannels();nowPlaying();status('Tuning CH '+channelNumber(id)+'…');
+  try{
+   const player=await ensurePlayer();
+   if(source!=='youtube'||selectedChannelId!==id)return;
+   player.loadPlaylist({list:requested.playlistId,listType:'playlist',index:0});
+   player.setVolume(+volumeInput.value);
+   status('Channel loaded. If playback does not start, click Play inside the YouTube player.');
+  }catch(err){status('Cannot tune YouTube: '+err.message);}
+ }
+ function renderLocalPlaylist(){
+  $('playlist').innerHTML=audioTracks.map((t,i)=>`<button class="${source==='audio'&&i===audioIndex?'active':''}" data-index="${i}">${L.escape(t.name)}</button>`).join('');
+  $('playlist').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>playAudio(+b.dataset.index)));
+ }
+ async function playAudio(i){
+  if(!audioTracks.length)return;
+  if(source==='youtube')stopYouTube();
+  source='audio';audioIndex=(i+audioTracks.length)%audioTracks.length;
+  audio.src=audioTracks[audioIndex].url;audio.load();renderLocalPlaylist();nowPlaying();
+  try{await audio.play();status('Broadcasting local music / radio to the cab');}catch(e){status('Audio playback blocked or unsupported: '+e.message);}
+  nowPlaying();
  }
  $('audioFiles').addEventListener('change',e=>{
   const files=Array.from(e.target.files||[]);
-  for(const file of files)playlist.push({name:file.name.replace(/\.[^.]+$/,''),url:URL.createObjectURL(file),local:true});
-  render();if(index<0&&playlist.length)play(0);e.target.value='';
+  for(const file of files)audioTracks.push({name:file.name.replace(/\.[^.]+$/,''),url:URL.createObjectURL(file),local:true});
+  renderLocalPlaylist();if(audioIndex<0&&audioTracks.length)playAudio(0);e.target.value='';
  });
  $('playStream').addEventListener('click',()=>{
-  const v=$('streamUrl').value.trim();if(!/^https:\/\//i.test(v)){$('radioStatus').textContent='Use a direct HTTPS audio stream URL.';return;}
-  playlist.push({name:'Internet Radio '+(playlist.length+1),url:v,local:false});play(playlist.length-1);
+  const val=$('streamUrl').value.trim();
+  if(!/^https:\/\//i.test(val)){status('Use a direct HTTPS audio stream URL.');return;}
+  audioTracks.push({name:'Internet Radio '+(audioTracks.length+1),url:val,local:false});
+  renderLocalPlaylist();playAudio(audioTracks.length-1);
  });
- $('playPause').addEventListener('click',async()=>{if(!a.src){if(playlist.length)play(0);else $('radioStatus').textContent='Choose a music file or HTTPS radio stream first.';return;}if(a.paused){try{await a.play();}catch(e){$('radioStatus').textContent=e.message;}}else a.pause();render();});
- $('prevTrack').addEventListener('click',()=>play(index<0?0:index-1));$('nextTrack').addEventListener('click',()=>play(index<0?0:index+1));
- a.addEventListener('ended',()=>{if(index>=0)play(index+1);});a.addEventListener('play',render);a.addEventListener('pause',render);
- $('radioVolume').addEventListener('input',e=>{a.volume=e.target.value/100;$('volumeValue').textContent=e.target.value;});
- $('radioCollapse').addEventListener('click',()=>{const box=$('radioContent'),hidden=box.hidden;box.hidden=!hidden;$('radioCollapse').textContent=hidden?'▾':'▴';$('radioCollapse').setAttribute('aria-expanded',String(hidden));});
- render();
+ $('playPause').addEventListener('click',async()=>{
+  if(source==='youtube'){
+   if(!ytReady){status('YouTube is still connecting.');return;}
+   try{if(ytPlaying)ytPlayer.pauseVideo();else ytPlayer.playVideo();}catch(e){status(e.message);}
+   return;
+  }
+  if(!audio.src){if(audioTracks.length)playAudio(0);else status('Choose a CB channel, local music file, or HTTPS radio stream.');return;}
+  if(audio.paused){try{await audio.play();}catch(e){status(e.message);}}else audio.pause();nowPlaying();
+ });
+ $('prevTrack').addEventListener('click',()=>{if(source==='youtube'&&ytReady)ytPlayer.previousVideo();else if(audioTracks.length)playAudio(audioIndex<0?0:audioIndex-1);});
+ $('nextTrack').addEventListener('click',()=>{if(source==='youtube'&&ytReady)ytPlayer.nextVideo();else if(audioTracks.length)playAudio(audioIndex<0?0:audioIndex+1);});
+ audio.addEventListener('ended',()=>{if(source==='audio'&&audioIndex>=0)playAudio(audioIndex+1);});
+ audio.addEventListener('play',()=>{if(source==='audio')nowPlaying();});
+ audio.addEventListener('pause',()=>{if(source==='audio')nowPlaying();});
+ volumeInput.addEventListener('input',e=>{
+  const v=+e.target.value;audio.volume=v/100;$('volumeValue').textContent=v;
+  if(ytPlayer&&ytReady)ytPlayer.setVolume(v);
+  try{localStorage.setItem(VOLUME_KEY,String(v));}catch(_){}
+ });
+ $('radioCollapse').addEventListener('click',()=>{
+  const content=$('radioContent'),opening=content.hidden;
+  if(!opening&&source==='youtube'&&ytPlayer&&ytReady){
+   ytPlayer.pauseVideo();ytPlaying=false;status('YouTube paused while radio panel is collapsed.');nowPlaying();
+  }
+  content.hidden=!opening;$('radioCollapse').textContent=opening?'▾':'▴';
+  $('radioCollapse').setAttribute('aria-expanded',String(opening));
+ });
+ renderChannels();nowPlaying();status('Ready. Tune a saved channel or load local music.');
 }
 Array.from(document.querySelectorAll('[data-resource]')).forEach(b=>b.addEventListener('click',()=>{
  state.resource=b.dataset.resource;
  document.querySelectorAll('[data-resource]').forEach(x=>{const active=x===b;x.classList.toggle('active',active);x.setAttribute('aria-pressed',String(active));});
 }));
 $('scanForm').addEventListener('submit',e=>{e.preventDefault();runScan(false);});$('refreshButton').addEventListener('click',()=>runScan(true));
+// Save the dashboard paint job independently from music presets and market cache.
+function liveryInit(){
+ const key='4nik8.dashboard.livery.v1', allowed=new Set(['amber','steel','oxide']), picker=$('liverySelect');
+ let chosen='steel';
+ try { const stored=localStorage.getItem(key);if(allowed.has(stored))chosen=stored; }catch(_){}
+ function apply(value){
+  const theme=allowed.has(value)?value:'steel';
+  document.documentElement.dataset.livery=theme;
+  picker.value=theme;
+  try{localStorage.setItem(key,theme);}catch(_){}
+ }
+ picker.addEventListener('change',()=>apply(picker.value));
+ apply(chosen);
+}
+liveryInit();
 radioInit();
 })();

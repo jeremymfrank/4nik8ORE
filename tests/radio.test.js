@@ -1,0 +1,16 @@
+'use strict';
+const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict'),path=require('path');
+const context={URL,console};context.window=context;
+vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../logic.js'),'utf8'),context);
+const parse=s=>context.ICLogic.parseYouTubePlaylistUrl(s);
+const id='PL1234567890abcdefghij';
+assert.equal(parse('https://music.youtube.com/playlist?list='+id+'&si=something').playlistId,id);
+assert.equal(parse('https://music.youtube.com/watch?v=abcdefghijk&list='+id).playlistId,id);
+assert.equal(parse('https://www.youtube.com/playlist?list='+id).playlistId,id);
+assert.equal(parse('https://music.youtube.com/browse/VL'+id).playlistId,id);
+assert.equal(parse('https://youtube.com/watch?list='+id+'&v=abcdefghijk').canonicalUrl,'https://music.youtube.com/playlist?list='+id);
+assert.throws(()=>parse('https://music.youtube.com/watch?v=abcdefghijk'),/No usable playlist ID/);
+assert.throws(()=>parse('https://example.com/playlist?list='+id),/Only shared YouTube/);
+assert.throws(()=>parse('http://music.youtube.com/playlist?list='+id),/HTTPS/);
+assert.throws(()=>parse('https://music.youtube.com/playlist?list=LM'),/No usable playlist ID/);
+console.log('Playlist link normalization: 9 passing assertions');

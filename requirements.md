@@ -18,7 +18,7 @@ Automatic opportunity intelligence for ore and ice mining plus hauling across al
 3. Mining ISK/hour calibrated via authorized skills/ships, measured mining data, or a clearly marked ship profile.
 4. Nearby-region and route selection, nullsec buyback markets (authenticated when allowed), jump freighter logistics, and manual/imported wormhole map connections.
 5. SQLite history, snapshots, alert thresholds, recurring sync and offline readiness.
-6. CB ContraBand Radio — local audio, presets, playlist, compact controls, stream failure handling.
+6. CB ContraBand Radio — **v0.2 supports saved public YouTube Music playlist channels**, visible official IFrame playback, local audio and HTTPS streams; future: preset backup/export, richer channel browser, stream failure handling.
 7. Reusable app launcher and self-updating installer.
 
 ## Accuracy invariant

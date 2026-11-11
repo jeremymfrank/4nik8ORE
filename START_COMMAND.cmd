@@ -1,3 +1,5 @@
 @echo off
 setlocal
-start "4NIK8 Industrial Command" "%~dp0index.html"
+cd /d "%~dp0"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0local_server.ps1"
+if errorlevel 1 pause
