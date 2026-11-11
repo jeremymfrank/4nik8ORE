@@ -1,4 +1,4 @@
-# 4NIK8 ORE — Industrial Command (Preview v0.3.0)
+# 4NIK8 ORE — Industrial Command (Preview v0.3.1)
 
 **Local-only, single-user EVE Online mining-market prototype**, optimized for a **1080×1920 portrait side monitor**. Features the **CB ContraBand Radio** with saved YouTube Music / YouTube playlist channels.
 
@@ -63,3 +63,13 @@ We could not reliably retrieve the exact colors of the provided RSI organization
 - [YouTube IFrame Player API](https://developers.google.com/youtube/iframe_api_reference)
 
 EVE Online and YouTube are trademarks of their respective owners. This is an independent 4NIK8 fan application, not an official CCP or Google product.
+
+## v0.3.1 hotfix (Windows PowerShell 5.1)
+
+- Fixed startup error `The string is missing the terminator: "` by using a strictly ASCII PowerShell launcher. The v0.3 source had a Unicode em dash without a BOM, which Windows PowerShell 5.1 could misinterpret as a closing quotation mark.
+- Uses explicitly constructed `TcpListener` and UTF-8 encoder objects, compatible with Windows PowerShell 5.1.
+- Includes the new in-game 4NIK8 corporation emblem, extracted from the user-provided screenshot, in the header.
+- Includes all referenced static assets in the release ZIP.
+- Existing CB radio stations and preferences remain in `%LOCALAPPDATA%\4NIK8 ORE\Industrial Command\settings.json`. Updating the program folder does not overwrite this file.
+
+**Upgrade:** Stop the old server window, extract this ZIP into a new folder, then run `START_COMMAND.cmd`. If the old version stored radio channels only in browser storage, open the new release with the **same browser profile and address** on first launch to import them. Use the EXPORT SETTINGS button for an additional portable backup once the app opens.

@@ -145,3 +145,9 @@ body{background:radial-gradient(ellipse at 58% 0%,#373023 0%,transparent 28%),re
 .youtube-links a{font:700 10px Consolas,monospace;color:var(--ice);text-decoration:none;border:1px solid var(--edge);padding:6px 8px;border-radius:3px}
 .youtube-links a:hover{text-decoration:underline}
 .channel-form-actions #newChannel{background:var(--panel2);color:var(--text);border:1px solid var(--edge)}
+
+/* v0.3.1 - in-game corporation crest in the command header */
+.brand-icon{background:radial-gradient(circle at center,#292528 20%,#0d1114 76%);padding:1px;overflow:hidden;border-color:#d76c2a;box-shadow:inset 0 0 9px #ff741d35,0 0 14px #fc791e30}
+.brand-icon img{display:block;width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 0 4px #ff6a1728)}
+/* Purple and wine corner chevrons from the official in-game identity. */
+.masthead:after{width:86px;opacity:.9;background:repeating-linear-gradient(115deg,#291034 0 12px,#7d3293 12px 25px,#210e19 25px 37px,#681c2d 37px 48px,#0f1118 48px 53px)}

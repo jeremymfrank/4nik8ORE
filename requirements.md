@@ -33,3 +33,6 @@ Never label market price as a guaranteed executable payout; never label a market
 - Separate NEW CHANNEL from EDIT; prevent duplicate entries for the same playlist ID.
 - Offer neon multicolor livery inspired by the 4NIK8 org banner while maintaining accessible profit numbers.
 - Correct route endpoint method to GET, validate via real ESI on user system.
+
+- Launcher script must be valid in Windows PowerShell 5.1: use ASCII-only for `.ps1` source or UTF-8 BOM, and include a static regression test to catch non-ASCII syntax hazards.
+- Release ZIP must include every referenced asset.
