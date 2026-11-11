@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>4NIK8 ORE — Industrial Command</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="frame">
+    <header class="masthead">
+      <div class="brand-icon" aria-hidden="true"><svg viewBox="0 0 60 60"><path d="M11 45L30 9l19 36-19-9-19 9Z"/><path d="M30 9v27M11 45l19-9 19 9"/></svg></div>
+      <div class="brand-titles"><div class="eyebrow">4NIK8 ORE // FREIGHT INTELLIGENCE</div><h1>INDUSTRIAL COMMAND</h1><div class="subhead">FIND THE MONEY ROCKS <span class="separator">/</span> HAUL THE MONEY ROCKS</div></div>
+      <div class="conn-status" id="connectionBadge"><span class="led"></span><span>NOT CONNECTED</span></div>
+    </header>
+    <main>
+      <section class="controls panel">
+        <div class="section-name"><span class="ordinal">01</span> SYSTEM NAVIGATION <span class="line"></span><span class="small-label">NEW EDEN / ANOIKIS</span></div>
+        <form id="scanForm">
+          <div class="field-row">
+            <label class="field grow" for="systemInput"><span>OPERATING SYSTEM</span><input id="systemInput" value="Gammel" list="systemExamples" required autocomplete="off" spellcheck="false"><datalist id="systemExamples"><option value="Gammel"><option value="Sosala"><option value="Anka"><option value="Masalle"><option value="Jita"><option value="J123456"></datalist></label>
+            <label class="field market-field" for="hubSelect"><span>COMPARE MARKET</span><select id="hubSelect"><option value="10000043">Amarr / Domain</option><option value="10000002">Jita / The Forge</option><option value="10000030">Rens / Heimatar</option><option value="10000042">Hek / Metropolis</option><option value="10000032">Dodixie / Sinq Laison</option><option value="10000038">The Bleak Lands</option><option value="10000068">Verge Vendor</option></select></label>
+          </div>
+          <div class="config-row">
+            <div class="segmented" role="group" aria-label="Resource group"><button type="button" class="segment active" data-resource="ore" aria-pressed="true">ORE</button><button type="button" class="segment" data-resource="ice" aria-pressed="false">ICE</button></div>
+            <label class="field load-field" for="cargoVolume"><span>LOAD TO PRICE · m³</span><input type="number" id="cargoVolume" min="1" max="10000000" step="1" value="31625"></label>
+          </div>
+          <div class="scan-actions"><button id="scanButton" class="primary" type="submit"><span aria-hidden="true">◎</span> SCAN MARKETS</button><button id="refreshButton" type="button" class="ghost" title="Refresh cached market data" disabled>↻ REFRESH</button></div>
+        </form>
+        <div class="location-summary" id="locationSummary" aria-live="polite"><span>Set a system and run the first scan.</span></div>
+      </section>
+      <section class="profit panel">
+        <div class="section-name"><span class="ordinal">02</span> OPPORTUNITY BOARD <span class="line"></span><span class="small-label">ORDER BOOK / ISK·M³</span></div>
+        <div class="headline"><div><div class="muted smallcaps">BEST QUOTED OPPORTUNITY</div><div class="headline-name" id="bestName">Awaiting live data</div></div><div class="headline-value"><span id="bestPrice">—</span><small>ISK / mined m³</small></div></div>
+        <div class="notice" id="notice" role="status">Market value is not proof an ore or ice site currently exists. Local system anomalies and wormhole connections are not publicly broadcast via ESI.</div>
+        <div class="sort-strip"><span>RESOURCE / FORM</span><span>BEST REGIONAL BUY ORDERS</span></div>
+        <div id="opportunities" class="opportunity-list"><div class="placeholder"><span class="reticle">◎</span><strong>READY FOR DEPARTURE</strong><p>Choose your operating system and run a market scan. Official ESI quotes will appear here.</p></div></div>
+        <div class="footer-note" id="dataFootnote">No estimated or invented price data is shown.</div>
+      </section>
+      <section class="detail panel">
+        <div class="section-name"><span class="ordinal">03</span> HAUL CALCULATOR <span class="line"></span><span class="small-label">REAL ROUTE / REAL ORDERS</span></div>
+        <div id="haulDetails" class="detail-body"><p class="muted">Select an opportunity after scanning to inspect its best quoted buyer station and route from your operating system.</p></div>
+      </section>
+      <section class="radio panel">
+        <div class="radio-header"><div class="radio-mark" aria-hidden="true">◉</div><div class="grow"><div class="eyebrow">CH 19 / 4NIK8 ORE ENTERTAINMENT</div><h2>CB ContraBand Radio</h2><div class="radio-tagline">If CONCORD asks, you ain't heard nothin'.</div></div><button class="radio-collapse" id="radioCollapse" aria-expanded="true" title="Collapse radio">▾</button></div>
+        <div id="radioContent">
+          <div class="frequency"><div class="smallcaps">NOW PLAYING</div><div id="nowPlaying">NO SIGNAL · SELECT AUDIO</div><div id="radioStatus">No stream or local tracks loaded</div></div>
+          <div class="player-controls"><button id="prevTrack" aria-label="Previous track" title="Previous">◀◀</button><button id="playPause" class="play" aria-label="Play or pause">▶</button><button id="nextTrack" aria-label="Next track" title="Next">▶▶</button><span class="volume-icon" aria-hidden="true">◖))</span><input type="range" id="radioVolume" aria-label="Radio volume" min="0" max="100" value="55"><span id="volumeValue">55</span></div>
+          <div class="radio-inputs"><label class="file-picker" for="audioFiles">+ ADD LOCAL MUSIC</label><input id="audioFiles" class="sr-only" type="file" multiple accept="audio/*"><div class="stream-row"><input id="streamUrl" type="url" placeholder="Internet radio stream URL (https://…)" aria-label="Internet radio URL"><button id="playStream" title="Play radio stream">TUNE IN</button></div></div>
+          <div id="playlist" class="playlist"></div>
+          <audio id="audioPlayer" preload="none"></audio>
+        </div>
+      </section>
+      <footer class="bottom"><span>4NIK8 ORE / INDUSTRIAL RECLAMATION</span><span class="version">PREVIEW v0.1.1 · LOCAL ONLY</span></footer>
+    </main>
+  </div>
+  <script src="logic.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
