@@ -44,7 +44,7 @@
         <div class="freight-settings" aria-label="Hauling profitability assumptions">
           <label class="field"><span>HAUL CAPACITY · m³</span><input id="haulCapacity" type="number" min="1" max="10000000" value="31625"></label>
           <label class="field"><span>SALES TAX · % (EST.)</span><input id="haulTax" type="number" min="0" max="100" step="0.1" value="7.5"></label>
-          <label class="field"><span>CASH COST · ISK/JUMP</span><input id="haulCostJump" type="number" min="0" max="100000000" step="1000" value="50000"></label>
+          <label class="field"><span>CASH EXPENSE · ISK/JUMP (OPTIONAL)</span><input id="haulCostJump" type="number" min="0" max="100000000" step="1000" value="0" title="Normally 0 ISK/jump when hauling your own cargo through stargates. Ship fuel or courier costs can be entered when relevant."></label>
           <label class="field"><span>MINUTES PER JUMP</span><input id="haulMinutesJump" type="number" min="0.1" max="120" step="0.5" value="2"></label>
           <label class="field"><span>PILOT TIME · ISK/HR</span><input id="haulTimeValue" type="number" min="0" max="1000000000" step="100000" value="0"></label>
           <label class="field"><span>STARGATE ROUTE</span><select id="haulRoutePref"><option value="Safer">SAFER</option><option value="Shorter">SHORTER</option><option value="LessSecure">LESS SECURE</option></select></label>
@@ -76,7 +76,7 @@
           <audio id="audioPlayer" preload="none"></audio>
         </div>
       </section>
-      <footer class="bottom"><span>4NIK8 ORE / INDUSTRIAL RECLAMATION</span><span class="version">PREVIEW v0.4.1 · LOCAL WINDOWS</span></footer>
+      <footer class="bottom"><span>4NIK8 ORE / INDUSTRIAL RECLAMATION</span><span class="version">PREVIEW v0.4.2 · LOCAL WINDOWS</span></footer>
     </main>
   </div>
   <script src="logic.js"></script>

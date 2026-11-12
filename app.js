@@ -10,7 +10,7 @@ const MAJOR_MARKET_REGIONS=[10000043,10000002,10000030,10000042,10000032];
 const FACTORY_JUPILUXE=Object.freeze({id:'factory-jupiluxe-v1',name:'Jupiluxe',url:'https://music.youtube.com/playlist?list=PLPvpJjBd_h4nG9C1K-nLrGWsdre_8kX9V',playlistId:'PLPvpJjBd_h4nG9C1K-nLrGWsdre_8kX9V'});
 const CACHE_TTL=300000; const memCache=new Map();
 const state={resource:'both',system:null,region:null,hub:'all',results:[],selected:null,lastRun:0,inProgress:false,runId:0,coverage:[],failed:0,routeToken:0,routeEstimates:new Map()};
-const ua='4NIK8-Industrial-Command-Preview/0.4.1';
+const ua='4NIK8-Industrial-Command-Preview/0.4.2';
 const esi='https://esi.evetech.net';
 const COMPAT_DATE='2025-12-16';
 function url(path){return esi+path.replace(/\/(?=\?|$)/,'')+(path.includes('?')?'&':'?')+'datasource=tranquility';}
@@ -157,7 +157,7 @@ const routePromises=new Map();
 const systemDetails=new Map();
 function freightInputs(){
  const read=(id,fallback,min,max)=>{const n=Number($(id).value);return Number.isFinite(n)?Math.max(min,Math.min(max,n)):fallback;};
- return {capacity:read('haulCapacity',31625,1,10000000),taxPct:read('haulTax',7.5,0,100),cashPerJump:read('haulCostJump',50000,0,100000000),minutesPerJump:read('haulMinutesJump',2,0.1,120),pilotISKHour:read('haulTimeValue',0,0,1000000000),preference:$('haulRoutePref').value};
+ return {capacity:read('haulCapacity',31625,1,10000000),taxPct:read('haulTax',7.5,0,100),cashPerJump:read('haulCostJump',0,0,100000000),minutesPerJump:read('haulMinutesJump',2,0.1,120),pilotISKHour:read('haulTimeValue',0,0,1000000000),preference:$('haulRoutePref').value};
 }
 function routeLabel(value){return !value?'ROUTE UNVERIFIED':value.jumps+' JUMPS · '+value.preference.toUpperCase();}
 function routeKey(dest){return [state.system?.id,dest,freightInputs().preference].join(':');}

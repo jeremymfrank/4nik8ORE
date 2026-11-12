@@ -60,3 +60,6 @@ Never label market price as a guaranteed executable payout; never label a market
 - Fetch NPC station names via public ESI; restricted Upwell structures remain unverified.
 - Price compressed cargo using the ESI physical volume of the compressed type; compare gross and estimated net, with user-defined tax, haul allowance and trip count.
 - Never claim mining-site availability, price PvP risk without evidence, or infer real ship cargo capacity from the target mined volume.
+### v0.4.2 cash freight default
+
+Default monetary stargate hauling expense is 0 ISK/jump for own-ship hauling. Time is tracked separately. Existing saved user-defined charges remain unchanged during upgrades.

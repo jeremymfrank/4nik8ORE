@@ -22,7 +22,7 @@ catch {
     Write-Host 'IMPORTANT: close the previous server window before running an updated version.'
     exit 1
 }
-Write-Host "4NIK8 Industrial Command v0.4.1 - $prefix" -ForegroundColor Cyan
+Write-Host "4NIK8 Industrial Command v0.4.2 - $prefix" -ForegroundColor Cyan
 Write-Host "Saved channels and preferences: $settingsFile"
 Write-Host 'Keep this window running. Ctrl+C closes the application server.'
 Start-Process $prefix
@@ -128,7 +128,7 @@ try {
                $selection = [string]$doc.radio.selectedChannelId
                if ($selection.Length -gt 90) { $selection = '' }
                # Extra freight fields are optional for backwards-compatible v0.3/v0.4 settings.
-               $haul = [ordered]@{capacity=31625;taxPct=7.5;cashPerJump=50000;minutesPerJump=2;pilotISKHour=0;preference='Safer'}
+               $haul = [ordered]@{capacity=31625;taxPct=7.5;cashPerJump=0;minutesPerJump=2;pilotISKHour=0;preference='Safer'}
                if ($null -ne $doc.haul) {
                   foreach ($name in @('capacity','taxPct','cashPerJump','minutesPerJump','pilotISKHour')) {
                      if ($null -ne $doc.haul.$name) {

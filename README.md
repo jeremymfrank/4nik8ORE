@@ -1,4 +1,4 @@
-# 4NIK8 ORE — Industrial Command (Preview v0.4.1)
+# 4NIK8 ORE — Industrial Command (Preview v0.4.2)
 
 **Local-only, single-user EVE Online mining-market prototype**, optimized for a **1080×1920 portrait side monitor**. Features the **CB ContraBand Radio** with saved YouTube Music / YouTube playlist channels.
 
@@ -84,6 +84,11 @@ EVE Online and YouTube are trademarks of their respective owners. This is an ind
 - Uses official unversioned ESI, `X-Compatibility-Date: 2025-12-16`, and `POST /route/{origin}/{destination}`. The new ESI response contains a `route` array; we no longer request the deprecated `/latest/route`.
 - One market scan now checks a bounded set of destination systems and ranks resources and buyer stations by *estimated net proceeds* where ESI confirms a stargate route. Unrouted offers remain marked **gross / route unverified** and must not be read as realistic profit.
 - Fetches NPC station names and correct compressed physical volume. Modern ore/ice compression preserves unit count while reducing physical cargo volume. **Compression service fees** and availability are not priced.
-- Configurable shipment hold volume, estimated sales tax, cash hauling cost per jump, minutes per jump, pilot time value, and safer/shorter/less secure routing. Cash cost assumes intermediate empty returns between shipment loads (2 × trips − 1 legs); no estimates of piracy loss probability are made. Defaults are sample allowances, not actual in-game costs.
+- Configurable shipment hold volume, estimated sales tax, cash hauling cost per jump, minutes per jump, pilot time value, and safer/shorter/less secure routing. Cash cost assumes intermediate empty returns between shipment loads (2 × trips − 1 legs); no estimates of piracy loss probability are made. The default cash cost is **0 ISK/jump** for self-hauling through ordinary stargates. Travel time remains included separately; no money cost is invented for stargate jumps. Existing saved cost overrides are preserved.
 - Settings, including new freight preferences, persist in `%LOCALAPPDATA%\4NIK8 ORE\Industrial Command\settings.json`. Fixes a v0.4.0 Windows settings validation mismatch for `ORE + ICE` and `AUTO` market scanning. The radio, playlist presets and theme remain unchanged.
 - No authenticated private-structure access, dynamic wormhole exits, mining sites, reprocessing fee calculations, or actual ship profile is implemented. ESI still needs testing on a Windows install.
+## v0.4.2 - Own-hauler default
+
+- **Cash expense per jump defaults to 0 ISK** for 4NIK8-owned hauling on ordinary stargate routes. It is optional for courier fees, jump-freighter fuel estimates, or explicit out-of-pocket costs.
+- Travel time still contributes to route duration and can be assigned a pilot time value, but cash cost and time are kept separate.
+- Existing AppData freight settings are deliberately not overwritten by updates. If a prior installation has 45,000 or 50,000 ISK/jump saved, change that field to **0** once; the app will persist your choice.
