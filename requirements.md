@@ -73,3 +73,7 @@ Implement separate ore/ice calibrated module profiles or timed-session rates (ef
 ### v0.4.4 diagnostic
 
 Provide a same-context official YouTube sample embed test to distinguish widespread iframe failure from playlist-specific refusal. Do not skip every track on repeated 150 errors, add a YouTube external-player button, or overwrite radio presets.
+
+### v0.4.5 factory radio safety
+
+Jupiluxe factory preset must use exactly `https://music.youtube.com/playlist?list=PLfXw8cc_z-vY&si=Dl5vr0dXqf0enefV`, ID `PLfXw8cc_z-vY`. Regression tests must assert both. Do not overwrite user-modified existing channels or introduce external YouTube fallback UI.

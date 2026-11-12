@@ -7,10 +7,10 @@ const RESOURCES={
 };
 const MARKETS={'10000043':'Domain (Amarr)','10000002':'The Forge (Jita)','10000030':'Heimatar (Rens)','10000042':'Metropolis (Hek)','10000032':'Sinq Laison (Dodixie)','10000038':'The Bleak Lands','10000068':'Verge Vendor'};
 const MAJOR_MARKET_REGIONS=[10000043,10000002,10000030,10000042,10000032];
-const FACTORY_JUPILUXE=Object.freeze({id:'factory-jupiluxe-v1',name:'Jupiluxe',url:'https://music.youtube.com/playlist?list=PLPvpJjBd_h4nG9C1K-nLrGWsdre_8kX9V',playlistId:'PLPvpJjBd_h4nG9C1K-nLrGWsdre_8kX9V'});
+const FACTORY_JUPILUXE=Object.freeze({id:'factory-jupiluxe-v1',name:'Jupiluxe',url:'https://music.youtube.com/playlist?list=PLfXw8cc_z-vY&si=Dl5vr0dXqf0enefV',playlistId:'PLfXw8cc_z-vY'});
 const CACHE_TTL=300000; const memCache=new Map();
 const state={resource:'both',system:null,region:null,hub:'all',results:[],selected:null,lastRun:0,inProgress:false,runId:0,coverage:[],failed:0,routeToken:0,routeEstimates:new Map()};
-const ua='4NIK8-Industrial-Command-Preview/0.4.4';
+const ua='4NIK8-Industrial-Command-Preview/0.4.5';
 const esi='https://esi.evetech.net';
 const COMPAT_DATE='2025-12-16';
 function url(path){return esi+path.replace(/\/(?=\?|$)/,'')+(path.includes('?')?'&':'?')+'datasource=tranquility';}

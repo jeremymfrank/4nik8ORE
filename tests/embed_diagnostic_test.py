@@ -47,7 +47,7 @@ with sync_playwright() as p:
  assert 'TEST FAILED' in page.locator('#radioStatus').inner_text()
  assert 'Jupiluxe' in page.locator('#channelList').inner_text()
  page.locator('[data-tune]').first.click()
- page.wait_for_function("window.fakeYT && window.fakeYT.last && window.fakeYT.last.list==='PLPvpJjBd_h4nG9C1K-nLrGWsdre_8kX9V'")
+ page.wait_for_function("window.fakeYT && window.fakeYT.last && window.fakeYT.last.list==='PLfXw8cc_z-vY'")
  assert 'Jupiluxe' in page.locator('#nowPlaying').inner_text()
  assert not errors,errors
  print('PASS: same-context YouTube sample diagnostic, error-150 reporting, saved preset integrity, return to channel.')

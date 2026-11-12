@@ -60,6 +60,8 @@ with sync_playwright() as p:
  assert page.locator('#liverySelect').input_value()=='neon'
  assert page.locator('.channel-preset').count()==1
  assert 'Jupiluxe' in page.locator('#channelList').inner_text()
+ assert page.evaluate("JSON.parse(window.__store['4nik8.cb.channels.v1'])[0].playlistId")=='PLfXw8cc_z-vY'
+ assert page.evaluate("JSON.parse(window.__store['4nik8.cb.channels.v1'])[0].url")=='https://music.youtube.com/playlist?list=PLfXw8cc_z-vY&si=Dl5vr0dXqf0enefV'
  assert page.locator('#hubSelect').input_value()=='all'
  assert page.locator('[data-resource=both]').get_attribute('aria-pressed')=='true'
  assert page.locator('#youtubeExternal').count()==0

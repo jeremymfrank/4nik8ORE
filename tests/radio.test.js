@@ -3,6 +3,16 @@ const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict'),pat
 const context={URL,console};context.window=context;
 vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../logic.js'),'utf8'),context);
 const parse=s=>context.ICLogic.parseYouTubePlaylistUrl(s);
+// Regression: factory Jupiluxe is the user-confirmed link, not another playlist.
+const factoryApp=fs.readFileSync(path.join(__dirname,'../app.js'),'utf8');
+const expectedJupiluxe='https://music.youtube.com/playlist?list=PLfXw8cc_z-vY&si=Dl5vr0dXqf0enefV';
+const expectedFactory=`const FACTORY_JUPILUXE=Object.freeze({id:'factory-jupiluxe-v1',name:'Jupiluxe',url:'${expectedJupiluxe}',playlistId:'PLfXw8cc_z-vY'});`;
+assert.ok(factoryApp.includes(expectedFactory),'Factory Jupiluxe preset must match verified working link exactly');
+assert.ok(!factoryApp.includes('PLPvpJjBd_h4nG9C1K-nLrGWsdre_8kX9V'),'Unrelated playlist must not be factory Jupiluxe');
+assert.equal(parse(expectedJupiluxe).playlistId,'PLfXw8cc_z-vY');
+assert.equal(parse(expectedJupiluxe).shareUrl,expectedJupiluxe);
+console.log('Factory Jupiluxe identity and share URL: verified');
+
 const id='PL1234567890abcdefghij';
 assert.equal(parse('https://music.youtube.com/playlist?list='+id+'&si=something').playlistId,id);
 assert.equal(parse('https://music.youtube.com/watch?v=abcdefghijk&list='+id).playlistId,id);

@@ -1,4 +1,4 @@
-# 4NIK8 ORE — Industrial Command (Preview v0.4.4)
+# 4NIK8 ORE — Industrial Command (Preview v0.4.5)
 
 **Local-only, single-user EVE Online mining-market prototype**, optimized for a **1080×1920 portrait side monitor**. Features the **CB ContraBand Radio** with saved YouTube Music / YouTube playlist channels.
 
@@ -116,3 +116,9 @@ No market prices are fabricated. The cash-cost default remains **0 ISK per jump*
 - If the sample plays while shared Music playlists error with 150, it suggests restrictions or a format mismatch affecting the playlist items. If the sample also returns 150, investigate the browser, localhost embedding, extensions or a YouTube-side issue. Neither result proves the full root cause.
 - No autoplay bypass, download, direct media URL extraction, or external YouTube launch button. No automatic skipping through a possibly fully restricted playlist.
 - Existing Windows AppData radio presets, shipping costs and calibrated mining profiles are unchanged.
+
+## v0.4.5: correct Jupiluxe factory channel
+
+- Factory CH 01 now uses the user's verified working shared URL: `https://music.youtube.com/playlist?list=PLfXw8cc_z-vY&si=Dl5vr0dXqf0enefV` (playlist ID `PLfXw8cc_z-vY`). The previously packaged URL was an unrelated playlist.
+- Factory preset applies only on truly fresh installs. **Existing Windows AppData/browser presets are never overwritten or repaired silently**, including user-corrected Jupiluxe channels.
+- Adds an exact playlist-ID and share-URL regression test. No player API changes, external music launch buttons, or auto-skip behavior.
