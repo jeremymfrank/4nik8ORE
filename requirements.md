@@ -69,3 +69,7 @@ Default monetary stargate hauling expense is 0 ISK/jump for own-ship hauling. Ti
 ### v0.4.3 Mining performance
 
 Implement separate ore/ice calibrated module profiles or timed-session rates (effective m3/hour), persist profiles and session state in the existing Windows AppData settings JSON, and rank route-verified full-load buyers by expected end-to-end ISK/hour without fabricating yields. Show mining-only vs all-in hours and include final return travel by default. Preserve the 0 ISK/jump self-haul default and radio/visual settings. Future versions can use CCP SSO and an accurate SDE dogma fitting model; those are not part of v0.4.3.
+
+### v0.4.4 diagnostic
+
+Provide a same-context official YouTube sample embed test to distinguish widespread iframe failure from playlist-specific refusal. Do not skip every track on repeated 150 errors, add a YouTube external-player button, or overwrite radio presets.

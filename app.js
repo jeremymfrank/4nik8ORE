@@ -10,7 +10,7 @@ const MAJOR_MARKET_REGIONS=[10000043,10000002,10000030,10000042,10000032];
 const FACTORY_JUPILUXE=Object.freeze({id:'factory-jupiluxe-v1',name:'Jupiluxe',url:'https://music.youtube.com/playlist?list=PLPvpJjBd_h4nG9C1K-nLrGWsdre_8kX9V',playlistId:'PLPvpJjBd_h4nG9C1K-nLrGWsdre_8kX9V'});
 const CACHE_TTL=300000; const memCache=new Map();
 const state={resource:'both',system:null,region:null,hub:'all',results:[],selected:null,lastRun:0,inProgress:false,runId:0,coverage:[],failed:0,routeToken:0,routeEstimates:new Map()};
-const ua='4NIK8-Industrial-Command-Preview/0.4.3';
+const ua='4NIK8-Industrial-Command-Preview/0.4.4';
 const esi='https://esi.evetech.net';
 const COMPAT_DATE='2025-12-16';
 function url(path){return esi+path.replace(/\/(?=\?|$)/,'')+(path.includes('?')?'&':'?')+'datasource=tranquility';}
@@ -486,10 +486,57 @@ function radioInit(){
  function stopYouTube(){
   resetYouTubePlayer();
   selectedChannelId=null;trackTitle='';$('youtubeShell').hidden=true;
-  if(source==='youtube')source='none';
+  if(source==='youtube'||source==='youtube-diagnostic')source='none';
   renderChannels();nowPlaying();
  }
  $('stopYouTube').addEventListener('click',()=>{stopYouTube();status('YouTube channel off air.');});
+ // Diagnostic uses YouTube's own documented public player sample. It never
+ // changes a saved preset, requests account credentials, or bypasses an embed restriction.
+ async function testEmbeddedPlayback(){
+   audio.pause(); resetYouTubePlayer(); const generation=tuneSequence;
+   selectedChannelId=null; source='youtube-diagnostic'; trackTitle='';
+   $('radioContent').hidden=false; $('radioCollapse').textContent='▾';
+   $('radioCollapse').setAttribute('aria-expanded','true');
+   $('youtubeShell').hidden=false; $('youtubeChannelNumber').textContent='TEST';
+   $('nowPlaying').textContent='EMBED DIAGNOSTIC · OFFICIAL SAMPLE VIDEO';
+   $('playPause').textContent='▶'; renderChannels();
+   status('Connecting to YouTube sample video. Press Play inside the video to test actual playback.');
+   setChannelMessage('Diagnostic only; saved CB channel presets are unchanged.');
+   try{
+     const YT=await ensureYouTubeApi();
+     if(generation!==tuneSequence)return;
+     ytPlayer=new YT.Player('youtubePlayerMount',{
+       width:'100%',height:'100%',videoId:'M7lc1UVf-VE',
+       playerVars:{playsinline:1,controls:1,origin:window.location.origin},
+       events:{
+         onReady(e){
+           if(generation!==tuneSequence||e.target!==ytPlayer)return;
+           ytReady=true; ytPlaying=false; e.target.setVolume(+volumeInput.value);
+           status('Sample player loaded. Press Play inside the YouTube player to check actual playback.');
+         },
+         onStateChange(e){
+           if(generation!==tuneSequence||e.target!==ytPlayer)return;
+           ytPlaying=e.data===YT.PlayerState.PLAYING;
+           if(ytPlaying){
+             status('TEST PASS: the official sample plays in this browser. Playlist or track embed restrictions may be the problem.');
+             setChannelMessage('Sample video plays; your saved channels are unchanged.');
+           } else if(e.data===YT.PlayerState.PAUSED)status('Sample paused. Playback previously worked if you heard/saw it.');
+           $('playPause').textContent=ytPlaying?'❚❚':'▶';
+         },
+         onError(e){
+           if(generation!==tuneSequence||e.target!==ytPlayer)return;
+           ytReady=false;ytPlaying=false;ytEmbedFailed=true;
+           status('TEST FAILED: official sample returned YouTube error '+e.data+'. This points toward an embed/browser/YouTube issue, not solely a Jupiluxe song.');
+           setChannelMessage('Official YouTube sample returned error '+e.data+'. Report the number; saved CB stations are unchanged.',true);
+         },
+         onAutoplayBlocked(){
+           if(generation===tuneSequence)status('Sample autoplay blocked. Click Play directly in the visible YouTube video.');
+         }
+       }
+     });
+   }catch(e){if(generation===tuneSequence){status('Sample test failed to initialize: '+e.message);setChannelMessage('YouTube player could not initialize; no presets were changed.',true);}}
+ }
+ $('testYouTubeEmbed').addEventListener('click',testEmbeddedPlayback);
  function ensureYouTubeApi(){
   if(window.YT&&window.YT.Player)return Promise.resolve(window.YT);
   if(ytApiPromise)return ytApiPromise;
@@ -505,7 +552,7 @@ function radioInit(){
  // YouTube Music share links are not inherently invalid because their IDs are
  // shorter than familiar IDs. Preserve the original shared URL for fallback.
  function errorDescription(code){
-  const descriptions={2:'YouTube rejected the embedded playlist request (invalid parameter).',5:'YouTube HTML5 player error.',100:'A video is unavailable or private.',101:'The video owner disabled embedding.',150:'The video owner disabled embedding.',153:'YouTube rejected the embedded client identity / HTTP referrer.'};
+  const descriptions={2:'YouTube rejected the embedded playlist request (invalid parameter).',5:'YouTube HTML5 player error.',100:'A video is unavailable or private.',101:'The video owner disabled embedding.',150:'YouTube refused this embedded video (may also indicate a broader player issue).',153:'YouTube rejected the embedded client identity / HTTP referrer.'};
   return descriptions[code]||'YouTube could not play this content.';
  }
  async function tuneChannel(id){
@@ -557,7 +604,10 @@ function radioInit(){
         nowPlaying();
        }
       },
-      onError(event){
+      onAutoplayBlocked(){
+        if(generation===tuneSequence && source==='youtube')status('YouTube blocked automatic playback. Press Play directly in the visible player.');
+       },
+       onError(event){
        if(generation!==tuneSequence || source!=='youtube'||event.target!==ytPlayer)return;
        // One transparent compatibility attempt. We do not retry forever or
        // claim it fixes YouTube Music's own embed restrictions.
@@ -600,7 +650,7 @@ function radioInit(){
  }
  async function playAudio(i){
   if(!audioTracks.length)return;
-  if(source==='youtube')stopYouTube();
+  if(source==='youtube'||source==='youtube-diagnostic')stopYouTube();
   source='audio';audioIndex=(i+audioTracks.length)%audioTracks.length;
   audio.src=audioTracks[audioIndex].url;audio.load();renderLocalPlaylist();nowPlaying();
   try{await audio.play();status('Broadcasting local music / radio to the cab');}catch(e){status('Audio playback blocked or unsupported: '+e.message);}
@@ -619,7 +669,7 @@ function radioInit(){
   renderLocalPlaylist();playAudio(audioTracks.length-1);
  });
  $('playPause').addEventListener('click',async()=>{
-  if(source==='youtube'){
+  if(source==='youtube'||source==='youtube-diagnostic'){
    if(ytEmbedFailed){status('YouTube rejected this station inside CB ContraBand Radio. Choose another channel.');return;}
    if(!ytReady){status('YouTube is still connecting.');return;}
    try{if(ytPlaying)ytPlayer.pauseVideo();else ytPlayer.playVideo();}catch(e){status(e.message);}
@@ -641,7 +691,7 @@ function radioInit(){
  });
  $('radioCollapse').addEventListener('click',()=>{
   const content=$('radioContent'),opening=content.hidden;
-  if(!opening&&source==='youtube'&&ytPlayer&&ytReady){
+  if(!opening&&(source==='youtube'||source==='youtube-diagnostic')&&ytPlayer&&ytReady){
    ytPlayer.pauseVideo();ytPlaying=false;status('YouTube paused while radio panel is collapsed.');nowPlaying();
   }
   content.hidden=!opening;$('radioCollapse').textContent=opening?'▾':'▴';

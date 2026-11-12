@@ -1,4 +1,4 @@
-# 4NIK8 ORE — Industrial Command (Preview v0.4.3)
+# 4NIK8 ORE — Industrial Command (Preview v0.4.4)
 
 **Local-only, single-user EVE Online mining-market prototype**, optimized for a **1080×1920 portrait side monitor**. Features the **CB ContraBand Radio** with saved YouTube Music / YouTube playlist channels.
 
@@ -109,3 +109,10 @@ After the same cross-regional market scan, choose **ALL-IN ISK/HOUR** in Mining 
 No market prices are fabricated. The cash-cost default remains **0 ISK per jump**, and all settings, calibrated rates and an active session timestamp live in `%LOCALAPPDATA%\4NIK8 ORE\Industrial Command\settings.json` in the existing schema. Radio presets, Jupiluxe, shuffle, volume, and livery are unchanged.
 
 **Limitations:** No automatic ship skill/fitting import or EVE SSO in this release. The personal ESI mining ledger summarizes quantities by day/system/resource but does not include exact session minutes. This release deliberately requires one-time fit-value entry or a timer calibration instead of calling an unverified output 'actual'. Mining-site existence, local threats, critical bonuses not reflected in effective yield, residue, compression/refining costs, structure access, and wormhole exits remain unverified or excluded. The browser tests use synthetic ESI responses and do not prove live playability or actual EVE yield.
+
+## v0.4.4: YouTube embed diagnostic
+
+- **TEST EMBED** within the CB player loads the official YouTube IFrame API sample video `M7lc1UVf-VE` in the same app context, without touching the saved channels. The user presses Play inside the visible embedded player to confirm actual playback.
+- If the sample plays while shared Music playlists error with 150, it suggests restrictions or a format mismatch affecting the playlist items. If the sample also returns 150, investigate the browser, localhost embedding, extensions or a YouTube-side issue. Neither result proves the full root cause.
+- No autoplay bypass, download, direct media URL extraction, or external YouTube launch button. No automatic skipping through a possibly fully restricted playlist.
+- Existing Windows AppData radio presets, shipping costs and calibrated mining profiles are unchanged.

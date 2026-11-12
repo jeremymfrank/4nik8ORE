@@ -242,3 +242,8 @@ body{background:radial-gradient(ellipse at 58% 0%,#373023 0%,transparent 28%),re
 .mining-session-status{color:var(--muted);line-height:1.5;font-size:10px;margin-top:9px}
 .mining-disclaimer{margin:0}
 @media(max-width:510px){.mining-input-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.mining-config-title{display:block}.mining-config-title small{display:block;margin:5px 0}.mining-options{grid-template-columns:1fr}.mining-options .check-field{grid-column:1}.mining-metrics .metric-card strong{font-size:18px}}
+
+/* CB diagnostic controls: compact and readable at 1080x1920 portrait */
+.youtube-shell-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;align-items:center}
+.youtube-shell-actions button{min-height:32px;white-space:nowrap}
+@media(max-width:620px){.youtube-shell-actions{width:100%;justify-content:flex-start}}

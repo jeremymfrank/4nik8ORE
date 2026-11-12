@@ -105,16 +105,16 @@
             </form>
           </div>
           <div class="youtube-shell" id="youtubeShell" hidden>
-            <div class="youtube-shell-header"><strong>CH <span id="youtubeChannelNumber">19</span> · OFFICIAL YOUTUBE PLAYER</strong><button type="button" id="stopYouTube">■ OFF AIR</button></div>
+            <div class="youtube-shell-header"><strong>CH <span id="youtubeChannelNumber">19</span> · OFFICIAL YOUTUBE PLAYER</strong><div class="youtube-shell-actions"><button type="button" id="testYouTubeEmbed" title="Check if a YouTube sample video can play inside this dashboard">TEST EMBED</button><button type="button" id="stopYouTube">■ OFF AIR</button></div></div>
             <div id="youtubePlayerMount" class="youtube-player-mount"></div>
-            <p class="youtube-hint">Playback stays in the visible integrated YouTube player. Some shared playlists may be rejected by YouTube embedding; stations remain saved when a request fails.</p>
+            <p class="youtube-hint">Playback stays in the visible integrated YouTube player. If all playlists fail, use TEST EMBED to check a separate official YouTube sample. The test does not modify your stations.</p>
           </div>
           <div class="radio-inputs"><div class="source-label">OTHER SOURCES · LOCAL FILES &amp; INTERNET RADIO</div><label class="file-picker" for="audioFiles">+ ADD LOCAL MUSIC</label><input id="audioFiles" class="sr-only" type="file" multiple accept="audio/*"><div class="stream-row"><input id="streamUrl" type="url" placeholder="Internet radio stream URL (https://…)" aria-label="Internet radio URL"><button id="playStream" title="Play radio stream">TUNE IN</button></div></div>
           <div id="playlist" class="playlist"></div>
           <audio id="audioPlayer" preload="none"></audio>
         </div>
       </section>
-      <footer class="bottom"><span>4NIK8 ORE / INDUSTRIAL RECLAMATION</span><span class="version">PREVIEW v0.4.3 · LOCAL WINDOWS</span></footer>
+      <footer class="bottom"><span>4NIK8 ORE / INDUSTRIAL RECLAMATION</span><span class="version">PREVIEW v0.4.4 · LOCAL WINDOWS</span></footer>
     </main>
   </div>
   <script src="logic.js"></script>
