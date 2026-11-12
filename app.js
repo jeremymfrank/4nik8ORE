@@ -9,20 +9,21 @@ const MARKETS={'10000043':'Domain (Amarr)','10000002':'The Forge (Jita)','100000
 const MAJOR_MARKET_REGIONS=[10000043,10000002,10000030,10000042,10000032];
 const FACTORY_JUPILUXE=Object.freeze({id:'factory-jupiluxe-v1',name:'Jupiluxe',url:'https://music.youtube.com/playlist?list=PLPvpJjBd_h4nG9C1K-nLrGWsdre_8kX9V',playlistId:'PLPvpJjBd_h4nG9C1K-nLrGWsdre_8kX9V'});
 const CACHE_TTL=300000; const memCache=new Map();
-const state={resource:'both',system:null,region:null,hub:'all',results:[],selected:null,lastRun:0,inProgress:false,runId:0,coverage:[],failed:0,routeToken:0};
-const ua='4NIK8-Industrial-Command-Preview/0.4.0';
-const esi='https://esi.evetech.net/latest';
-function url(path){return esi+path+(path.includes('?')?'&':'?')+'datasource=tranquility&compatibility_date=2025-09-30&user_agent='+encodeURIComponent(ua);}
+const state={resource:'both',system:null,region:null,hub:'all',results:[],selected:null,lastRun:0,inProgress:false,runId:0,coverage:[],failed:0,routeToken:0,routeEstimates:new Map()};
+const ua='4NIK8-Industrial-Command-Preview/0.4.1';
+const esi='https://esi.evetech.net';
+const COMPAT_DATE='2025-12-16';
+function url(path){return esi+path.replace(/\/(?=\?|$)/,'')+(path.includes('?')?'&':'?')+'datasource=tranquility';}
 function setStatus(status,detail){$('connectionBadge').className='conn-status '+status;$('connectionBadge').querySelector('span:last-child').textContent=detail;}
 function message(t){$('locationSummary').textContent=t;}
 function bestPriceDisplay(n){return L.formatIsk(n,1);}
 async function request(path,opts={},ttl=CACHE_TTL,force=false){
- const k=path+(opts.body||''); const cached=memCache.get(k);
+ const k=(opts.method||'GET')+'|'+path+'|'+(opts.body||''); const cached=memCache.get(k);
  if((!force || path.startsWith('/markets/'))&&cached&&Date.now()-cached.at<ttl)return cached.value;
- const ctrl=new AbortController(), timeout=setTimeout(()=>ctrl.abort(),18000);
+ const ctrl=new AbortController(), timeout=setTimeout(()=>ctrl.abort(),path.startsWith('/route/')?11000:18000);
  try{
-  const r=await fetch(url(path),{method:opts.method||'GET',body:opts.body,headers:opts.body?{'Content-Type':'application/json'}:undefined,signal:ctrl.signal});
-  if(!r.ok)throw Error('ESI '+r.status+' '+r.statusText);
+  const r=await fetch(url(path),{method:opts.method||'GET',body:opts.body,headers:{'X-Compatibility-Date':COMPAT_DATE,'Accept':'application/json',...(opts.body?{'Content-Type':'application/json'}:{})},signal:ctrl.signal});
+  if(!r.ok)throw Error('ESI '+r.status+' '+(r.status===405?'route method/compatibility mismatch':r.statusText));
   const value=await r.json();memCache.set(k,{value,at:Date.now()});return value;
  }finally{clearTimeout(timeout);}
 }
@@ -44,7 +45,10 @@ async function loadResources(resource,force){
   const id=types[name];if(!id){map.push({name,error:'Item ID not resolved by ESI'});continue;}
   try{
    const detail=await request('/universe/types/'+id+'/',{},86400000,force);
-   map.push({name,id,compressedId:types['Compressed '+name]||null,volume:detail.volume});
+   const compressedId=types['Compressed '+name]||null;
+   let compressedVolume=null;
+   if(compressedId){try{const c=await request('/universe/types/'+compressedId+'/',{},86400000,force);compressedVolume=Number(c.volume)||null;}catch(_){/* Leave compressed quotes uncosted when SDE data is unavailable. */}}
+   map.push({name,id,compressedId,volume:detail.volume,compressedVolume});
   }catch(e){map.push({name,error:e.message});}
  }
  return map;
@@ -84,7 +88,7 @@ function assembleRows(types,payload,regions){
    if(!orders)continue;
    const quotes=L.rankStationQuotesAll(orders,units,item.volume);
    // Compare the best *station*, not a synthetic region-wide buyer.
-   for(const quote of quotes.slice(0,3))variants.push({form,region:reg,quote});
+   for(const quote of quotes.slice(0,3))variants.push({form,region:reg,quote,physicalUnitM3:form==='compressed'?item.compressedVolume:item.volume});
   }
   const winner=L.bestOpportunity(variants);
   const alternatives=variants.sort((a,b)=>Number(b.quote.full)-Number(a.quote.full)||b.quote.gross-a.quote.gross);
@@ -100,13 +104,13 @@ function drawRows(){
  el.innerHTML=state.results.map((item,idx)=>{
   if(!item.winner)return `<div class="op-card"><div class="rank">·</div><div class="op-main"><div class="op-name">${L.escape(item.name)}</div><div class="op-sub">${L.escape(item.error||'No executable public buy orders found for this sample load')}</div></div><div class="op-price"><strong>—</strong></div></div>`;
   ranking++;
-  const w=item.winner, full=w.quote.full, mark=w.form==='compressed'?'COMPRESSED':'RAW';
-  return `<div class="op-card ${state.selected===item.name?'selected':''}" data-item="${L.escape(item.name)}" role="button" tabindex="0" aria-label="Inspect ${L.escape(item.name)}"><div class="rank">${ranking}</div><div class="op-main"><div class="op-name">${L.escape(item.name)}</div><div class="op-sub">${mark} · ${L.escape(MARKETS[w.region]||state.system.regionName||'Other region')}${full?' · FULL LOAD':' · PARTIAL '+Math.round(w.quote.coverage*100)+'%'}</div></div><div class="op-price"><strong class="${full?'':'limited'}">${bestPriceDisplay(w.quote.perM3)}</strong><small>ISK/m³ · gross</small></div></div>`;
+  const w=item.winner, full=w.quote.full, mark=w.form==='compressed'?'COMPRESSED':'RAW',v=w.estimate? w.estimate.net/item.volume : w.quote.perM3;
+  return `<div class="op-card ${state.selected===item.name?'selected':''}" data-item="${L.escape(item.name)}" role="button" tabindex="0" aria-label="Inspect ${L.escape(item.name)}"><div class="rank">${ranking}</div><div class="op-main"><div class="op-name">${L.escape(item.name)}</div><div class="op-sub">${mark} · ${L.escape(MARKETS[w.region]||state.system.regionName||'Other region')}${full?' · FULL LOAD':' · PARTIAL '+Math.round(w.quote.coverage*100)+'%'}</div></div><div class="op-price"><strong class="${full?'':'limited'}">${bestPriceDisplay(v)}</strong><small>ISK/m³ · ${w.estimate?'est. net':'gross (unrouted)'}</small></div></div>`;
  }).join('');
  el.querySelectorAll('[data-item]').forEach(node=>{const callback=()=>selectItem(node.dataset.item);node.addEventListener('click',callback);node.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();callback();}});});
  const leader=state.results.find(x=>x.winner);
- $('bestName').textContent=leader?.name||'No visible buy orders';$('bestPrice').textContent=leader?bestPriceDisplay(leader.winner.quote.perM3):'—';
- $('dataFootnote').textContent=leader?'Quotes are gross, before market sales tax, processing, hauling and risk. Market depth is checked at a single buyer station; site availability is unknown.':'No executable public buy orders for the selected sample load. Private structure orders are not included.';
+ $('bestName').textContent=leader?.name||'No visible buy orders';$('bestPrice').textContent=leader?bestPriceDisplay(leader.winner.estimate?leader.winner.estimate.net/leader.volume:leader.winner.quote.perM3):'—';$('headlineUnit').textContent=leader?.winner?.estimate?'ISK / mined m³ · EST. NET':'ISK / mined m³ · GROSS';
+ $('dataFootnote').textContent=leader?'Order books are live; net estimates subtract user-defined sales tax and freight costs where ESI stargate routes were verified. No PvP risk, compression fees or mining site availability included.':'No executable public buy orders for the selected sample load. Private structure orders are not included.';
 }
 async function runScan(force=false){
  if(state.inProgress)return;
@@ -133,7 +137,11 @@ async function runScan(force=false){
   if(current!==state.runId)return;
   if(!payload.size)throw Error('No ESI market queries succeeded. Check network access or retry later.');
   state.failed=fail;state.results=assembleRows(resources,payload,regions);state.lastRun=Date.now();drawRows();
-  const first=state.results.find(x=>x.winner);if(first)selectItem(first.name);
+   $('haulDetails').innerHTML='<p class="muted">Calculating stargate routes and estimated freight costs from the same market scan…</p>';
+   await evaluateFreight(current);
+   if(current!==state.runId)return;
+   repriceFreight();drawRows();
+   const first=state.results.find(x=>x.winner);if(first)selectItem(first.name);
   setStatus('online',fail?'PARTIAL MARKET DATA':'CROSS-REGION ORDERS LOADED');
   $('dataFootnote').textContent+=' · '+regions.length+' public regions scanned · Retrieved '+new Date(state.lastRun).toLocaleString()+(fail?' · WARNING: '+fail+' market requests failed.':'');
   $('refreshButton').disabled=false;
@@ -143,28 +151,137 @@ async function runScan(force=false){
   $('bestName').textContent='Data unavailable';$('bestPrice').textContent='—';
  }finally{state.inProgress=false;$('scanButton').disabled=false;}
 }
-function selectItem(name){
- const item=state.results.find(x=>x.name===name);if(!item?.winner)return;state.selected=item.name;drawRows();
- const w=item.winner,q=w.quote,regionName=MARKETS[w.region]||state.system.regionName||'Other region';
- const alternatives=item.variants.filter(v=>v!==w && v.quote.locationId!==q.locationId).slice(0,3);
- $('haulDetails').innerHTML=`<div class="detail-row"><span>Resource evaluated</span><strong>${L.escape(item.name)}</strong></div><div class="detail-row"><span>Best public buy-order region</span><strong>${L.escape(regionName)}</strong></div><div class="detail-row"><span>Sale form</span><strong>${w.form==='raw'?'Raw':'Compressed'}</strong></div><div class="detail-row"><span>Sample mined volume</span><strong>${L.formatIsk(item.volume,1)} m³ / ${L.formatIsk(item.units)} units</strong></div><div class="detail-row"><span>Purchasable at quoted station</span><strong>${L.formatIsk(q.filled)} / ${L.formatIsk(q.units)} units</strong></div><div class="detail-row"><span>Gross buyer revenue</span><strong>${L.formatIsk(q.gross)} ISK</strong></div><div class="detail-row"><span>Buyer location</span><strong>${L.escape(String(q.locationId))}</strong></div><div class="detail-row"><span>Route from ${L.escape(state.system.name)}</span><strong id="routeResult">Resolving automatically…</strong></div><div class="market-alternatives"><strong>OTHER QUOTED BUYERS · SAME SCAN</strong>${alternatives.length?alternatives.map(v=>`<div class="alternate-row"><span>${L.escape(MARKETS[v.region]||'Operating region')} · ${v.form.toUpperCase()} · ${L.escape(String(v.quote.locationId))}</span><strong>${L.formatIsk(v.quote.gross)} ISK${v.quote.full?'':' · PARTIAL'}</strong></div>`).join(''):'<span class="muted tiny">No other public station quote found.</span>'}</div><p class="muted tiny">Single-station buy-order depth. Gross revenue only: no processing fees, tax, hauling cost, risk or travel time. Market site availability is unverified.</p>`;
- const token=++state.routeToken;
- autoRouteToBuyer(q,token);
+// Real buyer demand is from ESI; costs below are explicitly user-supplied estimates.
+// Net rankings are only used when a verified stargate route is available.
+const routePromises=new Map();
+const systemDetails=new Map();
+function freightInputs(){
+ const read=(id,fallback,min,max)=>{const n=Number($(id).value);return Number.isFinite(n)?Math.max(min,Math.min(max,n)):fallback;};
+ return {capacity:read('haulCapacity',31625,1,10000000),taxPct:read('haulTax',7.5,0,100),cashPerJump:read('haulCostJump',50000,0,100000000),minutesPerJump:read('haulMinutesJump',2,0.1,120),pilotISKHour:read('haulTimeValue',0,0,1000000000),preference:$('haulRoutePref').value};
 }
-async function autoRouteToBuyer(quote,token){
- const label=$('routeResult');if(!label)return;
- const isWH=state.system.id>=31000000&&state.system.id<32000000;
- if(isWH){label.textContent='Wormhole exits unknown · cannot calculate';return;}
- if(!quote.systemId){label.textContent='Buyer system not reported by market order';return;}
- try{
-  // 2026 CCP route API uses POST with preference/security_penalty in JSON body.
-  const body=JSON.stringify({preference:'Safer',security_penalty:50});
-  const result=await request('/route/'+state.system.id+'/'+quote.systemId+'/',{method:'POST',body},86400000);
-  if(token!==state.routeToken||!label.isConnected)return;
-  const route=Array.isArray(result)?result:Array.isArray(result.path)?result.path:null;
-  if(!route)throw Error('unexpected route response');
-  label.textContent=Math.max(0,route.length-1)+' stargate jumps (safer preference) · excludes wormholes/filaments/jump drives';
- }catch(e){if(token===state.routeToken&&label.isConnected)label.textContent='Route unavailable: '+e.message;}
+function routeLabel(value){return !value?'ROUTE UNVERIFIED':value.jumps+' JUMPS · '+value.preference.toUpperCase();}
+function routeKey(dest){return [state.system?.id,dest,freightInputs().preference].join(':');}
+function inWormhole(){return state.system&&state.system.id>=31000000&&state.system.id<32000000;}
+async function getRoute(dest){
+ if(!state.system||inWormhole()||!Number.isInteger(+dest)||Number(dest)<30000000||Number(dest)>=31000000)throw Error('No verified stargate route for this origin/destination');
+ const key=routeKey(dest);
+ if(routePromises.has(key))return routePromises.get(key);
+ const job=(async()=>{
+  if(+dest===+state.system.id)return {jumps:0,preference:freightInputs().preference};
+  const result=await request('/route/'+state.system.id+'/'+dest,{method:'POST',body:JSON.stringify({preference:freightInputs().preference,security_penalty:50})},86400000);
+  const path=Array.isArray(result?.route)?result.route:Array.isArray(result)?result:null;
+  if(!path||!path.length||+path[0]!==+state.system.id||+path[path.length-1]!==+dest)throw Error('Invalid ESI route response');
+  return {jumps:path.length-1,preference:freightInputs().preference};
+ })();
+ routePromises.set(key,job);
+ job.catch(()=>{if(routePromises.get(key)===job)routePromises.delete(key);});
+ return job;
+}
+async function buyerStation(loc,systemId){
+ const location=+loc;
+ if(location>=60000000&&location<64000000){
+  try{const data=await request('/universe/stations/'+location+'/',{},86400000);return {name:data.name||'NPC station '+location,systemId:data.system_id||systemId,verified:true};}
+  catch(_){return {name:'NPC station #'+location,systemId,verified:false};}
+ }
+ return {name:'Structure #'+loc+' · docking access unverified',systemId,verified:false};
+}
+async function systemInfo(id){
+ if(systemDetails.has(id))return systemDetails.get(id);
+ try {const data=await request('/universe/systems/'+id+'/',{},86400000);systemDetails.set(id,data);return data;}
+ catch(_){return {name:'System #'+id};}
+}
+function candidateList(item){
+ const seen=new Set(),result=[];
+ // Preserve alternatives from every market region, not only the global highest bids.
+ for(const v of item.variants){const key=v.region+'|'+v.form;
+  if(seen.has(key))continue;
+  seen.add(key);result.push(v);
+ }
+ // Also include a second station if it materially improves the route economics.
+ for(const v of item.variants){if(result.length>=24)break;if(!result.includes(v))result.push(v);}
+ return result;
+}
+function repriceFreight(){
+ const c=freightInputs();
+ for(const item of state.results){
+  if(!item.variants)continue;
+  for(const v of item.variants){
+   const key=routeKey(v.quote.systemId),route=state.routeEstimates?.get(key);
+   v.estimate=route&&v.physicalUnitM3?L.freightEstimate(v.quote,route.jumps,v.physicalUnitM3,item.volume,c):null;
+  }
+  const eligible=item.variants.filter(v=>v.estimate);
+  // A quote for the entire shipment wins over an incomplete fill. Never present
+  // a partial bid as if it purchased the entire mined load.
+  eligible.sort((a,b)=>Number(b.quote.full)-Number(a.quote.full)||(b.estimate.net-a.estimate.net));
+  item.winner=eligible[0]||L.bestOpportunity(item.variants);
+ }
+ state.results.sort((a,b)=>{
+  const x=a.winner,y=b.winner;
+  const category=v=>!v?0:v.estimate?(v.quote.full?4:2):(v.quote.full?3:1);
+  return category(y)-category(x) || (y?.estimate?.net??y?.quote?.gross??0)-(x?.estimate?.net??x?.quote?.gross??0);
+ });
+}
+async function evaluateFreight(run){
+ if(inWormhole())return;
+ state.routeEstimates=new Map();
+ const counts=new Map();
+ for(const item of state.results){
+  if(!item.variants)continue;
+  for(const v of candidateList(item)){
+   const dest=v.quote.systemId;
+   if(!dest)continue;
+   counts.set(dest,(counts.get(dest)||0)+1);
+  }
+ }
+ // Prioritize commonly quoted destination systems; one route serves many
+ // resources and buying stations. Cap the network work for one scan.
+ const systems=[...counts].sort((a,b)=>b[1]-a[1]).slice(0,28).map(x=>+x[0]);
+ const status=$('dataFootnote');
+ await pool(systems.map(dest=>async()=>({dest,key:routeKey(dest),route:await getRoute(dest)})),4,(i,data,error)=>{
+  if(run!==state.runId)return;
+  if(!error&&data){state.routeEstimates.set(data.key,data.route);}
+  status.textContent='Market orders loaded · calculating safer freight routes '+state.routeEstimates.size+'/'+systems.length+' · no price fabrication';
+ });
+}
+async function runRoutesOnly(){
+ if(state.inProgress||!state.results.length||!state.system)return;
+ state.inProgress=true;const run=++state.runId;
+ $('haulDetails').innerHTML='<p class="muted">Recalculating routes with new preference…</p>';
+ try{await evaluateFreight(run);if(run!==state.runId)return;repriceFreight();drawRows();const item=state.results.find(x=>x.name===state.selected)||state.results[0];if(item)selectItem(item.name);}
+ finally{state.inProgress=false;}
+}
+function selectItem(name){
+ const item=state.results.find(x=>x.name===name);if(!item?.winner)return;
+ state.selected=item.name;drawRows();
+ const token=++state.routeToken;
+ renderFreight(item,token);
+}
+async function renderFreight(item,token){
+ const container=$('haulDetails');
+ const c=freightInputs(),routeCount=state.routeEstimates?.size||0;
+ const variants=candidateList(item);
+ const enriched=variants.map(v=>({...v,estimate:v.estimate||null})).sort((a,b)=>{
+  const status=v=>v.estimate?(v.quote.full?4:2):(v.quote.full?3:1);
+  return status(b)-status(a)||(b.estimate?.net??b.quote.gross)-(a.estimate?.net??a.quote.gross);
+ });
+ const primary=enriched[0];
+ if(!primary){container.innerHTML='<p class="muted">No buyer quotes for this resource.</p>';return;}
+ const statusText=primary.estimate?('EST. NET '+L.formatIsk(primary.estimate.net)+' ISK'):'ROUTE UNVERIFIED';
+ const intro=`<div class="freight-summary"><div><span class="smallcaps">SELECTED MINED RESOURCE</span><strong>${L.escape(item.name)}</strong><small>${L.formatIsk(item.volume,1)} mined m³ · ${L.formatIsk(item.units)} units · raw / compressed comparison</small></div><div class="freight-net"><span>${statusText}</span><small>${primary.estimate?'After configured tax and transport allowances':'Only verified routes receive net estimates'}</small></div></div>`;
+ const rows=enriched.slice(0,12).map((v,i)=>{
+  const q=v.quote,e=v.estimate,reg=MARKETS[v.region]||('Region '+v.region);
+  const safe=L.escape;
+  const location=`<span class="buyer-station-name" data-station="${q.locationId}">Station #${q.locationId}</span>`;
+  const net=e?'<strong class="freight-profit">'+L.formatIsk(e.net)+' ISK</strong>':'<strong class="freight-unknown">ROUTE NOT VERIFIED</strong>';
+  return `<div class="freight-destination ${i===0?'best':''}"><div class="freight-destination-top"><div><span class="freight-rank">${i+1}</span><b>${location}</b><span class="freight-region">${safe(reg)} · ${v.form.toUpperCase()}</span></div>${net}</div><div class="freight-destination-bottom"><span>${e?routeLabel({jumps:e.jumps,preference:c.preference}):'Route unavailable'} · ${e?e.trips+' trip'+(e.trips===1?'':'s'):'—'}</span><span>GROSS ${L.formatIsk(q.gross)} ISK · ${q.full?'FULL LOAD':'PARTIAL '+Math.round(q.coverage*100)+'%'}</span></div></div>`;
+ }).join('');
+ const costs=primary.estimate?`<div class="freight-costs"><div><span>Taxes (${c.taxPct}%)</span><strong>−${L.formatIsk(primary.estimate.salesTax)} ISK</strong></div><div><span>Transport allowance</span><strong>−${L.formatIsk(primary.estimate.haulCashCost)} ISK</strong></div><div><span>Pilot time allowance</span><strong>−${L.formatIsk(primary.estimate.timeCost)} ISK</strong></div><div><span>Est. travel (outbound + returns)</span><strong>${L.formatIsk(primary.estimate.travelMinutes)} min</strong></div><div><span>Transport volume</span><strong>${L.formatIsk(primary.estimate.shippedM3,2)} m³</strong></div></div>`:'';
+ container.innerHTML=intro+`<div class="freight-cost-caption">ESTIMATED FREIGHT · ${c.taxPct}% TAX · ${L.formatIsk(c.cashPerJump)} ISK / JUMP · ${L.formatIsk(c.capacity)} m³ HOLD · ${routeCount} KNOWN ROUTES</div><div class="freight-destinations">${rows}</div>`+costs+`<p class="muted tiny freight-disclaimer">Estimates exclude compression fees, losses, docking restrictions, taxes other than configured sales tax and PvP risk. Partial orders cannot buy the whole load. Routes are stargate only. Current mining-site availability is not known from ESI. If routes failed, these destinations are unranked by net value.</p>`;
+ // Resolve human-readable NPC station names automatically without changing the price ranking.
+ await pool(enriched.slice(0,12).map(v=>async()=>({id:v.quote.locationId,station:await buyerStation(v.quote.locationId,v.quote.systemId)})),4,(_,data)=>{
+  if(token!==state.routeToken||!data||!container.isConnected)return;
+  container.querySelectorAll('[data-station="'+data.id+'"]').forEach(el=>{el.textContent=data.station.name;});
+ });
 }
 function radioInit(){
  const audio=$('audioPlayer');
@@ -441,7 +558,12 @@ Array.from(document.querySelectorAll('[data-resource]')).forEach(b=>b.addEventLi
  document.querySelectorAll('[data-resource]').forEach(x=>{const active=x===b;x.classList.toggle('active',active);x.setAttribute('aria-pressed',String(active));});
 }));
 $('scanForm').addEventListener('submit',e=>{e.preventDefault();settingsManager.schedule();runScan(false);});
-['systemInput','hubSelect','cargoVolume'].forEach(id=>$(id).addEventListener('change',()=>settingsManager.schedule()));$('refreshButton').addEventListener('click',()=>runScan(true));
+['systemInput','hubSelect','cargoVolume'].forEach(id=>$(id).addEventListener('change',()=>settingsManager.schedule()));
+['haulCapacity','haulTax','haulCostJump','haulMinutesJump','haulTimeValue'].forEach(id=>$(id).addEventListener('change',()=>{
+ settingsManager.schedule();if(state.results.length){repriceFreight();drawRows();const item=state.results.find(x=>x.name===state.selected);if(item)selectItem(item.name);}
+}));
+$('haulRoutePref').addEventListener('change',()=>{settingsManager.schedule();if(state.results.length)runRoutesOnly();});
+$('refreshButton').addEventListener('click',()=>runScan(true));
 
 // Settings are stored in %LOCALAPPDATA% via the loopback host, outside the
 // extracted release folder. Browser storage is retained for v0.2 migration.
@@ -455,7 +577,7 @@ const settingsManager=(()=>{
   const n=Number(readLocal(keys.volume,'55'));
   return {schemaVersion:1,livery:readLocal(keys.livery,'neon'),
    radio:{volume:Number.isFinite(n)?Math.max(0,Math.min(100,n)):55,shuffle:readLocal(keys.shuffle,'0')==='1',channels:channels.slice(0,40),selectedChannelId:readLocal(keys.last,'')},
-   scanner:{system:$('systemInput').value.trim(),hub:$('hubSelect').value,resource:state.resource,cargo:Math.max(1,Math.trunc(+$('cargoVolume').value||31625))}};
+   scanner:{system:$('systemInput').value.trim(),hub:$('hubSelect').value,resource:state.resource,cargo:Math.max(1,Math.trunc(+$('cargoVolume').value||31625))},haul:freightInputs()};
  }
  function apply(data){
   if(!data||data.schemaVersion!==1)return;
@@ -466,6 +588,11 @@ const settingsManager=(()=>{
     if(typeof data.radio?.shuffle==='boolean')localStorage.setItem(keys.shuffle,data.radio.shuffle?'1':'0');
    if(typeof data.radio?.selectedChannelId==='string')localStorage.setItem(keys.last,data.radio.selectedChannelId);
   }catch(_){}
+  const haul=data.haul||{};
+  for(const [id,key,min,max] of [['haulCapacity','capacity',1,10000000],['haulTax','taxPct',0,100],['haulCostJump','cashPerJump',0,100000000],['haulMinutesJump','minutesPerJump',0.1,120],['haulTimeValue','pilotISKHour',0,1000000000]]){
+   if(haul[key]!==undefined&&Number.isFinite(+haul[key])&&+haul[key]>=min&&+haul[key]<=max)$(id).value=haul[key];
+  }
+  if(['Safer','Shorter','LessSecure'].includes(haul.preference))$('haulRoutePref').value=haul.preference;
   const scan=data.scanner||{};
   if(typeof scan.system==='string'&&scan.system)$('systemInput').value=scan.system;
   if(typeof scan.hub==='string'&&[...$('hubSelect').options].some(x=>x.value===scan.hub))$('hubSelect').value=scan.hub;

@@ -22,7 +22,7 @@ catch {
     Write-Host 'IMPORTANT: close the previous server window before running an updated version.'
     exit 1
 }
-Write-Host "4NIK8 Industrial Command v0.3.1 - $prefix" -ForegroundColor Cyan
+Write-Host "4NIK8 Industrial Command v0.4.1 - $prefix" -ForegroundColor Cyan
 Write-Host "Saved channels and preferences: $settingsFile"
 Write-Host 'Keep this window running. Ctrl+C closes the application server.'
 Start-Process $prefix
@@ -118,19 +118,34 @@ try {
                   $cleanChannels += [ordered]@{id=$id;name=$name;playlistId=$list;url=$savedUrl}
                }
                $resource = [string]$doc.scanner.resource
-               if (@('ore','ice') -notcontains $resource) { throw 'Invalid resource' }
+               if (@('ore','ice','both') -notcontains $resource) { throw 'Invalid resource' }
                $hub = [string]$doc.scanner.hub
-               if ($hub -notmatch '^\d{8}$') { throw 'Invalid hub' }
+               if ($hub -ne 'all' -and $hub -ne 'local' -and $hub -notmatch '^\d{8}$') { throw 'Invalid hub' }
                $sys = [string]$doc.scanner.system
                if ($sys.Length -gt 100) { throw 'Invalid system' }
                $cargo = [int]$doc.scanner.cargo
                if ($cargo -lt 1 -or $cargo -gt 10000000) { throw 'Invalid cargo volume' }
                $selection = [string]$doc.radio.selectedChannelId
                if ($selection.Length -gt 90) { $selection = '' }
+               # Extra freight fields are optional for backwards-compatible v0.3/v0.4 settings.
+               $haul = [ordered]@{capacity=31625;taxPct=7.5;cashPerJump=50000;minutesPerJump=2;pilotISKHour=0;preference='Safer'}
+               if ($null -ne $doc.haul) {
+                  foreach ($name in @('capacity','taxPct','cashPerJump','minutesPerJump','pilotISKHour')) {
+                     if ($null -ne $doc.haul.$name) {
+                        $n = 0.0
+                        if (-not [double]::TryParse([string]$doc.haul.$name,[ref]$n)) { throw 'Invalid haul cost' }
+                        $limit = switch ($name) { 'capacity' {10000000} 'taxPct' {100} 'cashPerJump' {100000000} 'minutesPerJump' {120} 'pilotISKHour' {1000000000} }
+                        $min = if ($name -eq 'capacity') {1} elseif ($name -eq 'minutesPerJump') {0.1} else {0}
+                        if ($n -lt $min -or $n -gt $limit) { throw 'Haul cost out of range' }
+                        $haul[$name] = $n
+                     }
+                  }
+                  if (@('Safer','Shorter','LessSecure') -contains [string]$doc.haul.preference) {$haul.preference=[string]$doc.haul.preference}
+               }
                $clean = [ordered]@{
                   schemaVersion=1; livery=[string]$doc.livery;
                   radio=[ordered]@{volume=$volume;shuffle=$shuffle;channels=$cleanChannels;selectedChannelId=$selection};
-                  scanner=[ordered]@{system=$sys;hub=$hub;resource=$resource;cargo=$cargo}
+                  scanner=[ordered]@{system=$sys;hub=$hub;resource=$resource;cargo=$cargo};haul=$haul
                }
                $json = ConvertTo-Json -InputObject $clean -Depth 8 -Compress
                if (-not (Test-Path -LiteralPath $dataRoot)) { [System.IO.Directory]::CreateDirectory($dataRoot) | Out-Null }

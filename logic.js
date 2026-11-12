@@ -50,6 +50,22 @@ api.parseYouTubePlaylistUrl=function(raw){
     throw Error('No usable playlist ID was found. Share the playlist itself, not a single song or private library view.');
   return {playlistId:list,canonicalUrl:'https://music.youtube.com/playlist?list='+encodeURIComponent(list),shareUrl:u.href};
 };
+// Convert a buyer's actual executable quantity to estimated take-home ISK.
+// Modern compressed ore and compressed ice map 1 input unit to 1 output unit;
+// volume per unit is supplied by ESI rather than hardcoded.
+api.freightEstimate=function(quote,jumps,unitM3,minedRawM3,opts){
+ if(!quote || jumps===null || jumps===undefined || !Number.isFinite(+jumps) || +jumps<0 || unitM3===null || unitM3===undefined || !Number.isFinite(+unitM3) || +unitM3<=0)return null;
+ const capacity=+opts.capacity,volume=+quote.filled*+unitM3;
+ if(!(capacity>0)||!(minedRawM3>0))return null;
+ const trips=Math.ceil(volume/capacity);
+ const totalJumpLegs=+jumps*Math.max(0,2*trips-1); // return between loads, end at destination
+ const salesTax=+quote.gross*(+opts.taxPct/100);
+ const haulCashCost=totalJumpLegs*+opts.cashPerJump;
+ const travelMinutes=totalJumpLegs*+opts.minutesPerJump;
+ const timeCost=travelMinutes/60*+opts.pilotISKHour;
+ const net=+quote.gross-salesTax-haulCashCost-timeCost;
+ return {jumps:+jumps,trips,totalJumpLegs,salesTax,haulCashCost,travelMinutes,timeCost,net,shippedM3:volume,perMinedM3:net/minedRawM3,full:!!quote.full};
+};
 api.formatIsk=function(n,digits=0){return Number.isFinite(n)?new Intl.NumberFormat('en-US',{maximumFractionDigits:digits}).format(n):'—';};
 api.escape=function(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));};
 global.ICLogic=api;

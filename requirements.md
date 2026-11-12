@@ -51,3 +51,12 @@ Never label market price as a guaranteed executable payout; never label a market
 - One scan covers major public trading regions plus operating region; list actual single-station depth and gross value for each item, with trade-region alternatives.
 - Auto route via CCP documented POST where stargate routes exist; no route estimates for unknown wormhole exits.
 - Mining-site presence, private structure markets, net profit and genuine ISK/hour are not available in v0.4.
+
+
+### Freight Analyzer v0.4.1
+- Fetch and cache new ESI `POST /route` response, use documented `route` field and check origin/destination.
+- Prefetch up to 28 common buyer-system routes during a market scan; avoid unrealistically exhaustive route calls.
+- Use actual buy-order quantities from one station; do not sum different stations to make a sale.
+- Fetch NPC station names via public ESI; restricted Upwell structures remain unverified.
+- Price compressed cargo using the ESI physical volume of the compressed type; compare gross and estimated net, with user-defined tax, haul allowance and trip count.
+- Never claim mining-site availability, price PvP risk without evidence, or infer real ship cargo capacity from the target mined volume.

@@ -176,3 +176,31 @@ body{background:radial-gradient(ellipse at 58% 0%,#373023 0%,transparent 28%),re
 .alternate-row span{color:var(--muted)}
 .alternate-row strong{text-align:right;color:var(--green)}
 @media(max-width:620px){.alternate-row{flex-direction:column;align-items:start}.alternate-row strong{text-align:left}}
+
+/* v0.4.1 freight profit console for 1080x1920 portrait. */
+.freight-settings{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;padding:13px;margin-bottom:12px;background:linear-gradient(120deg,#1a2228,#27202c);border:1px solid var(--edge);border-radius:5px;}
+.freight-settings .field>span{font-size:9px;letter-spacing:.4px}
+.freight-settings input,.freight-settings select{font-size:12px;min-height:36px;padding:7px 8px}
+.freight-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;background:linear-gradient(115deg,#23242b,#242035);border:1px solid var(--amber2);padding:12px;border-radius:5px;flex-wrap:wrap}
+.freight-summary>div:first-child{display:grid;gap:5px}
+.freight-summary strong{font-size:19px;color:var(--text)}
+.freight-summary small,.freight-net small{font-size:10px;color:var(--muted)}
+.freight-net{display:grid;gap:3px;text-align:right}
+.freight-net span{font-size:20px;font-weight:900;color:var(--green)}
+.freight-cost-caption{padding:12px 0 8px;color:var(--muted);font-size:10px;letter-spacing:.4px}
+.freight-destinations{display:grid;gap:7px;max-height:520px;overflow:auto;scrollbar-width:thin}
+.freight-destination{border:1px solid var(--edge);border-left:3px solid var(--ice);background:linear-gradient(90deg,#20252a,#1b2025);border-radius:5px;padding:10px 12px;display:grid;gap:8px}
+.freight-destination.best{border-color:var(--amber);background:linear-gradient(110deg,#2d2631,#192a30)}
+.freight-destination-top,.freight-destination-bottom{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.freight-destination-top>div{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap}
+.freight-rank{background:var(--livery-dim);color:var(--amber);padding:4px 6px;border-radius:3px;font-size:10px}
+.buyer-station-name{font-size:12px;font-weight:850;color:var(--text);min-width:0;overflow-wrap:anywhere}
+.freight-region{font-size:10px;color:var(--muted)}
+.freight-destination-bottom{font-size:10px;color:var(--muted)}
+.freight-profit{font-size:16px!important;color:var(--green)!important;text-align:right;white-space:nowrap}
+.freight-unknown{font-size:10px!important;color:var(--bad)!important;text-align:right}
+.freight-costs{margin-top:10px;border-top:1px solid var(--edge);padding-top:7px;display:grid;gap:5px}
+.freight-costs>div{display:flex;justify-content:space-between;gap:10px;font-size:11px}
+.freight-costs>div span{color:var(--muted)}
+.freight-disclaimer{line-height:1.55;margin-top:12px}
+@media(max-width:680px){.freight-settings{grid-template-columns:repeat(2,minmax(0,1fr))}.freight-summary,.freight-destination-top,.freight-destination-bottom{align-items:flex-start;flex-direction:column}.freight-net{text-align:left}.freight-profit{text-align:left}.freight-destinations{max-height:none}}

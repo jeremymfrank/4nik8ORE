@@ -1,4 +1,4 @@
-# 4NIK8 ORE — Industrial Command (Preview v0.4.0)
+# 4NIK8 ORE — Industrial Command (Preview v0.4.1)
 
 **Local-only, single-user EVE Online mining-market prototype**, optimized for a **1080×1920 portrait side monitor**. Features the **CB ContraBand Radio** with saved YouTube Music / YouTube playlist channels.
 
@@ -77,3 +77,13 @@ EVE Online and YouTube are trademarks of their respective owners. This is an ind
 - **No claimed mining-location discovery yet:** ESI does not publish live deposits or wormhole exits, and static eligibility per system has not yet been indexed. Determining where a deposit really exists remains future work.
 - **Factory radio:** Jupiluxe preset ships in the code with its user-provided playlist URL. It does not ship music files or alter existing user settings.
 - **No external player UI:** playlists only use the embedded official YouTube player.
+
+
+## v0.4.1 - Freight Profit Analyzer
+
+- Uses official unversioned ESI, `X-Compatibility-Date: 2025-12-16`, and `POST /route/{origin}/{destination}`. The new ESI response contains a `route` array; we no longer request the deprecated `/latest/route`.
+- One market scan now checks a bounded set of destination systems and ranks resources and buyer stations by *estimated net proceeds* where ESI confirms a stargate route. Unrouted offers remain marked **gross / route unverified** and must not be read as realistic profit.
+- Fetches NPC station names and correct compressed physical volume. Modern ore/ice compression preserves unit count while reducing physical cargo volume. **Compression service fees** and availability are not priced.
+- Configurable shipment hold volume, estimated sales tax, cash hauling cost per jump, minutes per jump, pilot time value, and safer/shorter/less secure routing. Cash cost assumes intermediate empty returns between shipment loads (2 × trips − 1 legs); no estimates of piracy loss probability are made. Defaults are sample allowances, not actual in-game costs.
+- Settings, including new freight preferences, persist in `%LOCALAPPDATA%\4NIK8 ORE\Industrial Command\settings.json`. Fixes a v0.4.0 Windows settings validation mismatch for `ORE + ICE` and `AUTO` market scanning. The radio, playlist presets and theme remain unchanged.
+- No authenticated private-structure access, dynamic wormhole exits, mining sites, reprocessing fee calculations, or actual ship profile is implemented. ESI still needs testing on a Windows install.
