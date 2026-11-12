@@ -10,7 +10,7 @@ const MAJOR_MARKET_REGIONS=[10000043,10000002,10000030,10000042,10000032];
 const FACTORY_JUPILUXE=Object.freeze({id:'factory-jupiluxe-v1',name:'Jupiluxe',url:'https://music.youtube.com/playlist?list=PLfXw8cc_z-vY&si=Dl5vr0dXqf0enefV',playlistId:'PLfXw8cc_z-vY'});
 const CACHE_TTL=300000; const memCache=new Map();
 const state={resource:'both',system:null,region:null,hub:'all',results:[],selected:null,lastRun:0,inProgress:false,runId:0,coverage:[],failed:0,routeToken:0,routeEstimates:new Map()};
-const ua='4NIK8-Industrial-Command-Preview/0.4.5';
+const ua='4NIK8-Industrial-Command-Preview/0.4.6';
 const esi='https://esi.evetech.net';
 const COMPAT_DATE='2025-12-16';
 function url(path){return esi+path.replace(/\/(?=\?|$)/,'')+(path.includes('?')?'&':'?')+'datasource=tranquility';}
@@ -486,6 +486,9 @@ function radioInit(){
  function stopYouTube(){
   resetYouTubePlayer();
   selectedChannelId=null;trackTitle='';$('youtubeShell').hidden=true;
+  // Restore the radio controls when the compact visible video is switched off.
+  $('radioContent').classList.remove('radio-compact');$('radioContent').hidden=false;
+  $('radioCollapse').textContent='▾';$('radioCollapse').setAttribute('aria-expanded','true');
   if(source==='youtube'||source==='youtube-diagnostic')source='none';
   renderChannels();nowPlaying();
  }
@@ -495,7 +498,7 @@ function radioInit(){
  async function testEmbeddedPlayback(){
    audio.pause(); resetYouTubePlayer(); const generation=tuneSequence;
    selectedChannelId=null; source='youtube-diagnostic'; trackTitle='';
-   $('radioContent').hidden=false; $('radioCollapse').textContent='▾';
+   $('radioContent').hidden=false;$('radioContent').classList.remove('radio-compact'); $('radioCollapse').textContent='▾';
    $('radioCollapse').setAttribute('aria-expanded','true');
    $('youtubeShell').hidden=false; $('youtubeChannelNumber').textContent='TEST';
    $('nowPlaying').textContent='EMBED DIAGNOSTIC · OFFICIAL SAMPLE VIDEO';
@@ -564,7 +567,7 @@ function radioInit(){
   source='youtube';selectedChannelId=id;trackTitle='';
   try{localStorage.setItem('4nik8.cb.lastChannel.v1',id);}catch(_){}
   settingsManager.schedule();
-  $('radioContent').hidden=false;$('radioCollapse').textContent='▾';$('radioCollapse').setAttribute('aria-expanded','true');
+  $('radioContent').hidden=false;$('radioContent').classList.remove('radio-compact');$('radioCollapse').textContent='▾';$('radioCollapse').setAttribute('aria-expanded','true');
   $('youtubeShell').hidden=false;renderChannels();nowPlaying();status('Tuning CH '+channelNumber(id)+'…');
   // Play only in the integrated official YouTube player; no external launch fallback.
   try {
@@ -690,12 +693,17 @@ function radioInit(){
   settingsManager.schedule();
  });
  $('radioCollapse').addEventListener('click',()=>{
-  const content=$('radioContent'),opening=content.hidden;
-  if(!opening&&(source==='youtube'||source==='youtube-diagnostic')&&ytPlayer&&ytReady){
-   ytPlayer.pauseVideo();ytPlaying=false;status('YouTube paused while radio panel is collapsed.');nowPlaying();
-  }
-  content.hidden=!opening;$('radioCollapse').textContent=opening?'▾':'▴';
+  const content=$('radioContent'),opening=content.hidden||content.classList.contains('radio-compact');
+  const videoVisible=(source==='youtube'||source==='youtube-diagnostic')&&!$('youtubeShell').hidden;
+  // The official YouTube player must remain visible; never pause, remove or hide
+  // its iframe just because the pilot minimized the rest of the radio controls.
+  if(!opening){
+   if(videoVisible){content.hidden=false;content.classList.add('radio-compact');}
+   else content.hidden=true;
+  }else{content.hidden=false;content.classList.remove('radio-compact');}
+  $('radioCollapse').textContent=opening?'▾':'▴';
   $('radioCollapse').setAttribute('aria-expanded',String(opening));
+  $('radioCollapse').title=opening?'Collapse radio':'Expand radio';
  });
  renderChannels();nowPlaying();status('Ready. Tune a saved channel or load local music.');
 }
@@ -712,6 +720,171 @@ $('scanForm').addEventListener('submit',e=>{e.preventDefault();settingsManager.s
 $('haulRoutePref').addEventListener('change',()=>{settingsManager.schedule();if(state.results.length)runRoutesOnly();});
 $('refreshButton').addEventListener('click',()=>runScan(true));
 
+// Cross-region trade-run discovery. A live order at one NPC station is not
+// fungible with a different station's order. A route is needed for ISK/hour.
+const TRADE_PRESETS={
+ minerals:['Tritanium','Pyerite','Mexallon','Isogen','Nocxium','Zydrine','Megacyte','Morphite'],
+ fuel:['Heavy Water','Liquid Ozone','Strontium Clathrates','Helium Isotopes','Hydrogen Isotopes','Oxygen Isotopes','Nitrogen Isotopes','Robotics'],
+ pi:['Robotics','Coolant','Mechanical Parts','Enriched Uranium','Consumer Electronics','Guidance Systems','Miniature Electronics','Oxygen']
+};
+let tradeLastRun=0,tradeScanned=[],tradeScanning=false;
+const tradeRouteCache=new Map();
+function tradeNames(){
+ return [...new Set($('tradeItems').value.split(/[,\n;]/).map(x=>x.trim()).filter(Boolean))];
+}
+function tradeSettings(){
+ const budget=Math.max(1,Math.min(1e12,Number($('tradeBudget').value)||25000000));
+ const handling=Math.max(.1,Math.min(10000,Number($('tradeHandling').value)||10));
+ return {budget,handling,items:tradeNames().slice(0,16).join(', '),sort:$('tradeSort').value,returnHome:$('tradeReturn').checked};
+}
+function tradeOptions(){const h=freightInputs(),t=tradeSettings();return {...t,capacity:h.capacity,taxPct:h.taxPct,preference:h.preference,minutesPerJump:h.minutesPerJump,cashPerJump:h.cashPerJump};}
+function tradeStatus(text){$('tradeStatus').textContent=text;}
+// Bounded station shortlists represent best prices AND meaningful bulk depth.
+function topTradeBooks(groups,side){
+ const scored=groups.map(g=>({g,first:g.orders[0]?.price||0}));
+ scored.sort((a,b)=>side==='sell'?a.first-b.first:b.first-a.first);
+ const top=scored.slice(0,7).map(x=>x.g);
+ const deep=[...groups].sort((a,b)=>b.units-a.units).slice(0,3);
+ return [...new Map([...top,...deep].map(g=>[g.locationId,g])).values()];
+}
+async function tradeRoute(from,to,preference){
+ if(from===to)return 0;
+ if(!Number.isInteger(+from)||!Number.isInteger(+to)||+from<30000000||+to<30000000||+from>=31000000||+to>=31000000)throw Error('Unverifiable wormhole or unknown stargate route');
+ const key=from+':'+to+':'+preference;
+ if(!tradeRouteCache.has(key)){
+  const promise=(async()=>{
+   const r=await request('/route/'+from+'/'+to,{method:'POST',body:JSON.stringify({preference,security_penalty:50})},86400000);
+   const route=Array.isArray(r?.route)?r.route:Array.isArray(r)?r:null;
+   if(!route||+route[0]!==+from||+route[route.length-1]!==+to)throw Error('Route not confirmed by ESI');
+   return Math.max(0,route.length-1);
+  })();
+  tradeRouteCache.set(key,promise);
+  promise.catch(()=>{if(tradeRouteCache.get(key)===promise)tradeRouteCache.delete(key);});
+ }
+ return tradeRouteCache.get(key);
+}
+function tradeEstimate(quote,jumpPickup,jumpLoaded,jumpHome,opts){
+ const jumps=jumpPickup+jumpLoaded+jumpHome;
+ const freightCost=jumps*opts.cashPerJump;
+ const profit=quote.cashProfit-freightCost;
+ const minutes=jumps*opts.minutesPerJump+opts.handling;
+ if(!(profit>0&&minutes>0))return null;
+ return {...quote,profit,jumps,jumpPickup,jumpLoaded,jumpHome,
+  freightCost,minutes,iskHour:profit*60/minutes,roi:100*profit/quote.cost};
+}
+async function loadTradeRegionOrders(types,regions){
+ const work=[];
+ for(const item of types)for(const region of regions)work.push({item,region,job:()=>request('/markets/'+region+'/orders/?order_type=all&type_id='+item.id,{},CACHE_TTL)});
+ const books=new Map();let failures=0,done=0;
+ await pool(work.map(w=>w.job),5,(i,data,error)=>{
+  const w=work[i];if(!error&&Array.isArray(data))books.set(w.item.id+'|'+w.region,data);
+  else failures++;
+  done++;tradeStatus('Reading public buy/sell orders '+done+' / '+work.length+' · '+regions.length+' regions'+(failures?' · '+failures+' failed':'')+' · ESI 5-minute cache');
+ });
+ return {books,failures,requests:work.length};
+}
+function candidateTradeRuns(types,regions,books,options){
+ const results=[];
+ for(const item of types){
+  const sells=[],buys=[];
+  for(const region of regions){
+   const orders=books.get(item.id+'|'+region)||[];
+   const selling=topTradeBooks(L.tradeStationBooks(orders,'sell'),'sell');
+   const buying=topTradeBooks(L.tradeStationBooks(orders,'buy'),'buy');
+   for(const book of selling)sells.push({...book,region});
+   for(const book of buying)buys.push({...book,region});
+  }
+  const candidate=[];
+  for(const source of sells)for(const dest of buys){
+   const quote=L.tradeQuote(source,dest,{...options,unitVolume:item.volume});
+   if(quote)candidate.push({item,source,dest,quote});
+  }
+  candidate.sort((a,b)=>b.quote.cashProfit-a.quote.cashProfit);
+  results.push(...candidate.slice(0,4));
+ }
+ // Protect the route API from an unbounded all-items Cartesian product.
+ return results.sort((a,b)=>b.quote.cashProfit-a.quote.cashProfit).slice(0,36);
+}
+function tradeCard(run,i){
+ const esc=L.escape,r=run.estimate,price=n=>L.formatIsk(n),num=n=>L.formatIsk(n,2);
+ return '<article class="trade-run '+(i===0?'best':'')+'">'+
+  '<div class="trade-run-name">'+(i+1)+'. '+esc(run.item.name)+' · '+num(run.quote.units)+' units / '+num(run.quote.volume)+' m³</div>'+
+  '<div class="trade-run-price"><div><small>NET CASH / RUN</small><strong>'+price(r.profit)+' ISK</strong></div><div><small>NET ISK / HOUR</small><strong>'+price(r.iskHour)+'</strong></div></div>'+
+  '<div class="trade-run-points">'+
+  '<div><span>BUY / PICKUP</span><strong><span data-trade-loc="'+run.quote.sourceId+'">Station #'+run.quote.sourceId+'</span> · '+esc(MARKETS[run.source.region]||String(run.source.region))+'</strong></div>'+
+  '<div><span>SELL / DELIVER</span><strong><span data-trade-loc="'+run.quote.destId+'">Station #'+run.quote.destId+'</span> · '+esc(MARKETS[run.dest.region]||String(run.dest.region))+'</strong></div>'+
+  '<div><span>BUY COST / CAPITAL</span><strong>'+price(r.cost)+' ISK</strong></div>'+
+  '<div><span>SELL REVENUE / GROSS</span><strong>'+price(r.revenue)+' ISK</strong></div>'+
+  '<div><span>SALES TAX</span><strong>−'+price(r.salesTax)+' ISK</strong></div>'+
+  '<div><span>FREIGHT CASH EXPENSE</span><strong>−'+price(r.freightCost)+' ISK</strong></div>'+
+  '<div><span>RETURN ON CAPITAL</span><strong>'+num(r.roi)+'%</strong></div>'+
+  '<div><span>JUMPS (START / LOADED / RETURN)</span><strong>'+r.jumpPickup+' / '+r.jumpLoaded+' / '+r.jumpHome+'</strong></div>'+
+  '<div><span>EST. TIME / ONE RUN</span><strong>'+num(r.minutes)+' minutes</strong></div></div>'+
+  '<div class="trade-run-footer">NPC stations · matched public market orders · quote is not reserved · route verified by ESI · risk and station taxes beyond configured sales tax excluded</div></article>';
+}
+async function drawTradeRuns(runs,summary){
+ const mount=$('tradeResults'),sort=$('tradeSort').value;
+ runs.sort((a,b)=>sort==='roi'?b.estimate.roi-a.estimate.roi:sort==='net'?b.estimate.profit-a.estimate.profit:b.estimate.iskHour-a.estimate.iskHour);
+ const shown=runs.slice(0,12);
+ if(!shown.length){mount.innerHTML='<p class="muted">No positive, route-verified trade runs found among the tested goods and stations. Consider a different watchlist, larger budget, or additional regions. An empty result is not proof no profitable trades exist elsewhere.</p>';return;}
+ mount.innerHTML=shown.map(tradeCard).join('');
+ const ids=[...new Set(shown.flatMap(r=>[r.quote.sourceId,r.quote.destId]))];
+ await pool(ids.map(id=>async()=>({id,data:await buyerStation(id,null)})),4,(_,result)=>{
+  if(tradeLastRun!==summary.run||!result)return;
+  mount.querySelectorAll('[data-trade-loc="'+result.id+'"]').forEach(el=>el.textContent=result.data.name);
+ });
+}
+async function scanTrade(){
+ if(tradeScanning)return;
+ const opts=tradeOptions(),requested=tradeNames();
+ if(!requested.length||requested.length>16){tradeStatus('Enter 1–16 exact EVE item names.');return;}
+ tradeScanning=true;const run=++tradeLastRun,btn=$('tradeScan');btn.disabled=true;
+ $('tradeResults').innerHTML='<p class="muted">Loading cross-region trade orders and evaluating executable station-to-station spreads…</p>';
+ try{
+  tradeStatus('Resolving operating system and '+requested.length+' item names…');
+  const [origin,itemsFound]=await Promise.all([findSystem($('systemInput').value.trim()),resolveNames(requested)]);
+  const map=new Map((itemsFound.inventory_types||[]).map(x=>[x.name.toLowerCase(),x.id]));
+  const matched=requested.filter(x=>map.has(x.toLowerCase())).map(name=>({name,id:map.get(name.toLowerCase())}));
+  const missing=requested.filter(x=>!map.has(x.toLowerCase()));
+  if(!matched.length)throw Error('No goods resolved. Check spelling and EVE market item names.');
+  const typeWork=matched.map(x=>async()=>({...x,detail:await request('/universe/types/'+x.id+'/',{},86400000)}));
+  const types=[];await pool(typeWork,5,(_,item)=>{if(item&&Number(item.detail.volume)>0)types.push({name:item.name,id:item.id,volume:+item.detail.volume});});
+  if(!types.length)throw Error('No tradeable goods with a known physical volume.');
+  const regions=scanRegions(origin.regionId,$('hubSelect').value);
+  if(!regions.length)throw Error('No public market in the selected operating region.');
+  const retrieved=await loadTradeRegionOrders(types,regions);
+  if(!retrieved.books.size)throw Error('All regional market requests failed. No prices were invented.');
+  const candidates=candidateTradeRuns(types,regions,retrieved.books,opts);
+  if(!candidates.length){
+   tradeStatus('No positive buy/sell spreads found in scanned NPC stations'+(missing.length?' · Not found: '+missing.join(', '):''));
+   $('tradeResults').innerHTML='<p class="muted">No positive station-to-station public order spreads for this budget and cargo capacity. Try another watchlist or region. This scan excludes private structures.</p>';return;
+  }
+  const routeWork=candidates.map(c=>async()=>{
+   const first=await tradeRoute(origin.id,c.quote.sourceSystem,opts.preference);
+   const loaded=await tradeRoute(c.quote.sourceSystem,c.quote.destSystem,opts.preference);
+   const home=opts.returnHome?await tradeRoute(c.quote.destSystem,origin.id,opts.preference):0;
+   return {...c,estimate:tradeEstimate(c.quote,first,loaded,home,opts)};
+  });
+  const done=[];let completed=0,routeFailures=0;
+  await pool(routeWork,4,(_,result,error)=>{
+   completed++;if(error)routeFailures++;
+   if(result?.estimate)done.push(result);
+   tradeStatus('Routes '+completed+'/'+routeWork.length+' · '+done.length+' profitable verified runs · '+routeFailures+' route failures');
+  });
+  if(run!==tradeLastRun)return;
+  tradeScanned=done;
+  tradeStatus('Scanned '+types.length+' goods in '+regions.length+' regions · '+retrieved.requests+' market order requests · '+done.length+' confirmed profitable runs'+(retrieved.failures?' · '+retrieved.failures+' market errors':'')+(missing.length?' · Unknown: '+missing.join(', '):''));
+  await drawTradeRuns(done,{run});
+ }catch(error){if(run===tradeLastRun){tradeStatus('Trade scan failed: '+error.message);$('tradeResults').innerHTML='<p class="muted">Could not verify market opportunity. No guessed prices or routes were substituted.</p>';}}
+ finally{tradeScanning=false;btn.disabled=false;}
+}
+function tradeInit(){
+ $('tradeForm').addEventListener('submit',e=>{e.preventDefault();settingsManager.schedule();scanTrade();});
+ for(const key of ['tradeBudget','tradeHandling','tradeItems','tradeSort','tradeReturn'])$(key).addEventListener('change',()=>{settingsManager.schedule();if(key==='tradeSort'&&tradeScanned.length)drawTradeRuns(tradeScanned,{run:tradeLastRun});});
+ for(const btn of document.querySelectorAll('[data-trade-preset]'))btn.addEventListener('click',()=>{$('tradeItems').value=TRADE_PRESETS[btn.dataset.tradePreset].join(', ');settingsManager.schedule();});
+}
+tradeInit();
+
 // Settings are stored in %LOCALAPPDATA% via the loopback host, outside the
 // extracted release folder. Browser storage is retained for v0.2 migration.
 const settingsManager=(()=>{
@@ -724,7 +897,7 @@ const settingsManager=(()=>{
   const n=Number(readLocal(keys.volume,'55'));
   return {schemaVersion:1,livery:readLocal(keys.livery,'neon'),
    radio:{volume:Number.isFinite(n)?Math.max(0,Math.min(100,n)):55,shuffle:readLocal(keys.shuffle,'0')==='1',channels:channels.slice(0,40),selectedChannelId:readLocal(keys.last,'')},
-   scanner:{system:$('systemInput').value.trim(),hub:$('hubSelect').value,resource:state.resource,cargo:Math.max(1,Math.trunc(+$('cargoVolume').value||31625))},haul:freightInputs(),mining:miningSnapshot()};
+   scanner:{system:$('systemInput').value.trim(),hub:$('hubSelect').value,resource:state.resource,cargo:Math.max(1,Math.trunc(+$('cargoVolume').value||31625))},haul:freightInputs(),mining:miningSnapshot(),trade:tradeSettings()};
  }
  function apply(data){
   if(!data||data.schemaVersion!==1)return;
@@ -751,6 +924,12 @@ const settingsManager=(()=>{
   for(const [key,field] of [['observedOreM3Hour','ore'],['observedIceM3Hour','ice']]){const v=mine[key];miningObserved[field]=(v!==null&&v!==undefined&&Number.isFinite(+v)&&+v>0)?+v:null;}
   if(mine.session && ['ore','ice'].includes(mine.session.kind) && Number.isFinite(+mine.session.startedAt) && mine.session.startedAt>0 && mine.session.startedAt<=Date.now())miningSession={kind:mine.session.kind,startedAt:+mine.session.startedAt};
   else miningSession=null;
+  const savedTrade=data.trade||{};
+  if(Number.isFinite(+savedTrade.budget)&&+savedTrade.budget>=1&&+savedTrade.budget<=1e12)$('tradeBudget').value=+savedTrade.budget;
+  if(Number.isFinite(+savedTrade.handling)&&+savedTrade.handling>=.1&&+savedTrade.handling<=10000)$('tradeHandling').value=+savedTrade.handling;
+  if(typeof savedTrade.items==='string'&&savedTrade.items.length<=1800&&savedTrade.items.trim())$('tradeItems').value=savedTrade.items;
+  if(['hour','net','roi'].includes(savedTrade.sort))$('tradeSort').value=savedTrade.sort;
+  if(typeof savedTrade.returnHome==='boolean')$('tradeReturn').checked=savedTrade.returnHome;
   const scan=data.scanner||{};
   if(typeof scan.system==='string'&&scan.system)$('systemInput').value=scan.system;
   if(typeof scan.hub==='string'&&[...$('hubSelect').options].some(x=>x.value===scan.hub))$('hubSelect').value=scan.hub;

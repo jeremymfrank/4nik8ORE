@@ -126,9 +126,11 @@ with sync_playwright() as p:
  assert page.evaluate('window.__diskSettings.livery')=='oxide'
  assert page.evaluate('window.__diskSettings.radio.shuffle') is True
  page.locator('#radioCollapse').click()
- assert page.locator('#youtubeShell').is_hidden()
+ assert page.locator('#youtubeShell').is_visible()  # keep official player visible; no hidden audio
+ assert page.locator('#radioContent').evaluate("e=>e.classList.contains('radio-compact')")
  page.locator('#radioCollapse').click()
  assert page.locator('#youtubeShell').is_visible()
+ assert not page.locator('#radioContent').evaluate("e=>e.classList.contains('radio-compact')")
  # Restart with local browser storage deliberately cleared: disk copy restores it.
  page.evaluate('window.__store={}')
  page.set_content(html,wait_until='domcontentloaded')

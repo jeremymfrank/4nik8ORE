@@ -22,7 +22,7 @@ catch {
     Write-Host 'IMPORTANT: close the previous server window before running an updated version.'
     exit 1
 }
-Write-Host "4NIK8 Industrial Command v0.4.5 - $prefix" -ForegroundColor Cyan
+Write-Host "4NIK8 Industrial Command v0.4.6 - $prefix" -ForegroundColor Cyan
 Write-Host "Saved channels and preferences: $settingsFile"
 Write-Host 'Keep this window running. Ctrl+C closes the application server.'
 Start-Process $prefix
@@ -181,10 +181,30 @@ try {
                        }
                    }
                }
+               # Optional v0.4.6 freight exchange. No trade credentials or wallet keys.
+               $trade = [ordered]@{budget=25000000;handling=10;items='Tritanium, Pyerite, Mexallon, Isogen, Nocxium, Zydrine, Megacyte, Morphite, Heavy Water, Liquid Ozone, Robotics, Coolant';sort='hour';returnHome=$false}
+               if ($null -ne $doc.trade) {
+                  foreach ($field in @('budget','handling')) {
+                     if ($null -ne $doc.trade.$field) {
+                        $v = 0.0
+                        if (-not [double]::TryParse([string]$doc.trade.$field,[System.Globalization.NumberStyles]::Float,[System.Globalization.CultureInfo]::InvariantCulture,[ref]$v)) { throw 'Invalid trade amount' }
+                        if ($v -lt $(if ($field -eq 'budget') {1} else {0.1}) -or $v -gt $(if ($field -eq 'budget') {1000000000000} else {10000})) { throw 'Trade amount out of range' }
+                        $trade[$field]=$v
+                     }
+                  }
+                  $items=[string]$doc.trade.items
+                  if ($items.Length -gt 1800) { throw 'Trade watchlist too long' }
+                  if ($items.Trim().Length -gt 0) { $trade.items=$items }
+                  if (@('hour','net','roi') -contains [string]$doc.trade.sort) { $trade.sort=[string]$doc.trade.sort }
+                  if ($null -ne $doc.trade.returnHome) {
+                     if ($doc.trade.returnHome -isnot [bool]) { throw 'Invalid trade return flag' }
+                     $trade.returnHome=[bool]$doc.trade.returnHome
+                  }
+               }
                $clean = [ordered]@{
                   schemaVersion=1; livery=[string]$doc.livery;
                   radio=[ordered]@{volume=$volume;shuffle=$shuffle;channels=$cleanChannels;selectedChannelId=$selection};
-                  scanner=[ordered]@{system=$sys;hub=$hub;resource=$resource;cargo=$cargo};haul=$haul;mining=$mining
+                  scanner=[ordered]@{system=$sys;hub=$hub;resource=$resource;cargo=$cargo};haul=$haul;mining=$mining;trade=$trade
                }
                $json = ConvertTo-Json -InputObject $clean -Depth 8 -Compress
                if (-not (Test-Path -LiteralPath $dataRoot)) { [System.IO.Directory]::CreateDirectory($dataRoot) | Out-Null }

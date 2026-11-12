@@ -106,6 +106,61 @@ api.miningPerformance=function(item,variant,profile,haulOptions,kind){
    miningIskHour:afterTax/miningHours,allInIskHour:cashNet/timeHours,
    returnHome:!!profile.returnHome};
 };
+// Trade run quotes use separately executable station orders. Never sum inventory
+// from different stations into a pretend one-stop purchase or sale.
+api.tradeStationBooks=function(orders,side){
+ const books=new Map();
+ for(const order of orders||[]){
+  if(!order||!!order.is_buy_order!==(side==='buy')||!(+order.price>0)||!(+order.volume_remain>0))continue;
+  const location=+order.location_id;
+  // Public NPC stations only: public orders do not grant docking rights at structures.
+  if(!(location>=60000000&&location<64000000))continue;
+  const system=+order.system_id;
+  if(!(system>=30000000&&system<31000000))continue;
+  let book=books.get(location);
+  if(!book){book={locationId:location,systemId:system,orders:[],units:0};books.set(location,book);}
+  const volume=Math.floor(+order.volume_remain);
+  book.orders.push({price:+order.price,volume,minVolume:Math.max(1,Math.floor(+order.min_volume||1))});
+  book.units+=volume;
+ }
+ for(const b of books.values())b.orders.sort((a,c)=>side==='buy'?c.price-a.price:a.price-c.price);
+ return [...books.values()];
+};
+api.tradeQuote=function(seller,buyer,opts){
+ if(!seller||!buyer||seller.locationId===buyer.locationId)return null;
+ const capacity=+opts.capacity,unitVolume=+opts.unitVolume,budget=+opts.budget,tax=+opts.taxPct/100;
+ if(!(capacity>0&&unitVolume>0&&budget>0&&tax>=0&&tax<1))return null;
+ const cargoLimit=Math.min(Math.floor(capacity/unitVolume),1000000000);
+ if(cargoLimit<1)return null;
+ let i=0,j=0,units=0,cost=0,revenue=0,remaining=cargoLimit;
+ const sells=seller.orders,buys=buyer.orders;
+ let sLeft=sells[0]?.volume||0,bLeft=buys[0]?.volume||0;
+ const buyerAmounts=new Map(),sellerAmounts=new Map();
+ while(i<sells.length&&j<buys.length&&remaining>0){
+  if(!sLeft){i++;sLeft=sells[i]?.volume||0;continue;}
+  if(!bLeft){j++;bLeft=buys[j]?.volume||0;continue;}
+  const s=sells[i],b=buys[j];
+  if(b.price*(1-tax)<=s.price)break; // never buy negative-margin inventory
+  const affordable=Math.floor((budget-cost+1e-7)/s.price);
+  const qty=Math.min(sLeft,bLeft,remaining,affordable);
+  if(!(qty>0))break;
+  units+=qty;cost+=qty*s.price;revenue+=qty*b.price;
+  buyerAmounts.set(j,(buyerAmounts.get(j)||0)+qty);
+  sellerAmounts.set(i,(sellerAmounts.get(i)||0)+qty);
+  sLeft-=qty;bLeft-=qty;remaining-=qty;
+ }
+ // A buy order's minimum trade quantity must be met in one sell transaction.
+ // Reject estimates that depend on partially filling an order below its minimum.
+ for(const [idx,count] of buyerAmounts)if(count<buys[idx].minVolume)return null;
+ for(const [idx,count] of sellerAmounts)if(count<sells[idx].minVolume)return null;
+ if(!units||cost>budget+0.001)return null;
+ const salesTax=revenue*tax,profit=revenue-salesTax-cost;
+ if(!(profit>0))return null;
+ return {units,volume:units*unitVolume,cost,revenue,salesTax,cashProfit:profit,
+  marginPct:100*profit/cost,roiPct:100*profit/cost,
+  sourceId:seller.locationId,destId:buyer.locationId,
+  sourceSystem:seller.systemId,destSystem:buyer.systemId};
+};
 api.formatIsk=function(n,digits=0){return Number.isFinite(n)?new Intl.NumberFormat('en-US',{maximumFractionDigits:digits}).format(n):'—';};
 api.escape=function(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));};
 global.ICLogic=api;

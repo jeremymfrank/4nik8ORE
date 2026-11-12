@@ -77,3 +77,7 @@ Provide a same-context official YouTube sample embed test to distinguish widespr
 ### v0.4.5 factory radio safety
 
 Jupiluxe factory preset must use exactly `https://music.youtube.com/playlist?list=PLfXw8cc_z-vY&si=Dl5vr0dXqf0enefV`, ID `PLfXw8cc_z-vY`. Regression tests must assert both. Do not overwrite user-modified existing channels or introduce external YouTube fallback UI.
+
+### v0.4.6 freight exchange
+
+Scan up to 16 user-selected marketable goods across local + five major trade regions using public buy and sell orders. Use strict per-NPC-station depth and physical item volume, honor budgets, hauling capacity, taxes, remaining quantities, buy/sell minimum trade sizes and verified stargate routes. Rank cash-profit ISK/hour with optional return-to-origin, net profit and ROI. Never promise execution: market orders change and risk is not modeled. Persist trade scanner watchlist/budget/handling/sort/return in AppData with backward-compatible schema 1. Do not modify saved radio channels. Radio collapse must keep the original YouTube iframe visible (at least 200×200 px) with playback uninterrupted; local audio may collapse fully.

@@ -89,6 +89,24 @@
         </div>
         <p class="mining-disclaimer">Projected ISK/hour is not historical wallet profit. It uses calibrated production, public buyer orders, configured sales tax, verified stargate routes and handling time. Compression costs, travel to a mining site, residue, critical successes not reflected in your yield input, local ore availability, structure docking, taxes beyond the selected sale tax and ship-loss risk are excluded. When a measured rate is available it overrides the theoretical cycle rate.</p>
       </section>
+      <section class="trade panel" id="tradePanel">
+        <div class="section-name"><span class="ordinal">05</span> TRADE RUN SCANNER <span class="line"></span><span class="small-label">BUY LOW / SELL HIGH</span></div>
+        <p class="trade-intro">Find cross-region NPC-station purchase and resale opportunities. Quotes use real buy/sell order quantities, cargo volume, available ISK and stargate routes. No mining required.</p>
+        <form id="tradeForm">
+          <div class="trade-inputs">
+            <label class="field"><span>AVAILABLE BUYING CAPITAL · ISK</span><input type="number" id="tradeBudget" value="25000000" min="1" max="1000000000000" step="1"></label>
+            <label class="field"><span>HANDLING TIME / RUN · MIN</span><input type="number" id="tradeHandling" value="10" min="0.1" max="10000" step="any"></label>
+            <label class="field"><span>RANK BY</span><select id="tradeSort"><option value="hour">NET ISK / HOUR</option><option value="net">NET PROFIT / TRIP</option><option value="roi">RETURN ON CAPITAL %</option></select></label>
+            <label class="trade-checkbox"><input type="checkbox" id="tradeReturn"> Count final return to origin</label>
+          </div>
+          <label class="field trade-item-list"><span>GOODS TO SCAN · COMMA OR LINE SEPARATED (MAX 16)</span><textarea id="tradeItems" rows="3" spellcheck="false">Tritanium, Pyerite, Mexallon, Isogen, Nocxium, Zydrine, Megacyte, Morphite, Heavy Water, Liquid Ozone, Robotics, Coolant</textarea></label>
+          <div class="trade-presets"><span>LOAD WATCHLIST</span><button type="button" data-trade-preset="minerals">MINERALS</button><button type="button" data-trade-preset="fuel">FUEL & ICE</button><button type="button" data-trade-preset="pi">PLANETARY GOODS</button></div>
+          <button type="submit" class="trade-scan-button" id="tradeScan">↔ SCAN TRADE RUNS</button>
+        </form>
+        <div id="tradeStatus" class="trade-status" role="status" aria-live="polite">Ready · uses operating system, coverage, freight capacity, sales tax and route settings above.</div>
+        <div id="tradeResults" class="trade-results"><p class="muted">No live trade opportunities scanned. Enter a purchase budget and scan the goods you want to haul.</p></div>
+        <p class="trade-note">Estimates only. Public orders can change before arrival. NPC stations only; buyer ranges beyond the order station, PvP risk, and price movement are not guaranteed. Buying at existing sell orders and selling to existing buy orders do not require posting new orders.</p>
+      </section>
       <section class="radio panel">
         <div class="radio-header"><div class="radio-mark" aria-hidden="true">◉</div><div class="grow"><div class="eyebrow">CH 19 / 4NIK8 ORE ENTERTAINMENT</div><h2>CB ContraBand Radio</h2><div class="radio-tagline">If CONCORD asks, you ain't heard nothin'.</div></div><button class="radio-collapse" id="radioCollapse" aria-expanded="true" title="Collapse radio">▾</button></div>
         <div id="radioContent">
@@ -114,7 +132,7 @@
           <audio id="audioPlayer" preload="none"></audio>
         </div>
       </section>
-      <footer class="bottom"><span>4NIK8 ORE / INDUSTRIAL RECLAMATION</span><span class="version">PREVIEW v0.4.5 · LOCAL WINDOWS</span></footer>
+      <footer class="bottom"><span>4NIK8 ORE / INDUSTRIAL RECLAMATION</span><span class="version">PREVIEW v0.4.6 · LOCAL WINDOWS</span></footer>
     </main>
   </div>
   <script src="logic.js"></script>
