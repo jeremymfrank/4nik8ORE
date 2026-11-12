@@ -66,6 +66,46 @@ api.freightEstimate=function(quote,jumps,unitM3,minedRawM3,opts){
  const net=+quote.gross-salesTax-haulCashCost-timeCost;
  return {jumps:+jumps,trips,totalJumpLegs,salesTax,haulCashCost,travelMinutes,timeCost,net,shippedM3:volume,perMinedM3:net/minedRawM3,full:!!quote.full};
 };
+
+// A configured effective yield already includes ship, character and fitting bonuses.
+// Observed session yield is an alternative and includes actual inactive periods.
+api.miningRate=function(profile,kind,oreUnitM3){
+ if(!profile || !['ore','ice'].includes(kind))return null;
+ const observed=+(kind==='ice'?profile.observedIceM3Hour:profile.observedOreM3Hour);
+ if(Number.isFinite(observed)&&observed>0)return {m3Hour:observed,source:'measured'};
+ const count=+(kind==='ice'?profile.iceModules:profile.oreModules);
+ const amount=+(kind==='ice'?profile.iceUnits:profile.oreYield);
+ const seconds=+(kind==='ice'?profile.iceCycle:profile.oreCycle);
+ const uptime=+profile.uptimePct;
+ if(!(count>0&&Number.isInteger(count)&&amount>0&&seconds>0&&uptime>0&&uptime<=100))return null;
+ if(kind==='ice'&&!(oreUnitM3>0))return null;
+ const amountM3=kind==='ice'?amount*oreUnitM3:amount;
+ const rate=count*amountM3*3600/seconds*(uptime/100);
+ return Number.isFinite(rate)&&rate>0?{m3Hour:rate,source:'cycle'}:null;
+};
+// Revenue per hour after selected sales tax. Freight time is included only
+// in all-in ISK/hour; a pilot-time opportunity charge is not deducted again.
+// Return-to-origin is an optional EXTRA final empty leg, not included in the
+// freight module's default (2 * trips - 1) outbound/return trip model.
+api.miningPerformance=function(item,variant,profile,haulOptions,kind){
+ if(!item || !variant?.quote?.full || !variant.estimate || !(item.volume>0&&item.units>0))return null;
+ const rate=api.miningRate(profile,kind,item.volume/item.units);
+ if(!rate)return null;
+ const e=variant.estimate,q=variant.quote,haul=haulOptions;
+ const miningHours=item.volume/rate.m3Hour;
+ const finalReturnMinutes=profile.returnHome?e.jumps*+haul.minutesPerJump:0;
+ const finalReturnCash=profile.returnHome?e.jumps*+haul.cashPerJump:0;
+ const handlingMinutes=+profile.handlingMinutes;
+ const travelMinutes=e.travelMinutes+finalReturnMinutes;
+ const timeHours=miningHours+(travelMinutes+handlingMinutes)/60;
+ const afterTax=q.gross-e.salesTax;
+ const cashNet=afterTax-e.haulCashCost-finalReturnCash;
+ if(!(miningHours>0&&timeHours>0&&Number.isFinite(cashNet)))return null;
+ return {source:rate.source,rateM3Hour:rate.m3Hour,miningHours,
+   travelMinutes,finalReturnMinutes,handlingMinutes,timeHours,afterTax,cashNet,
+   miningIskHour:afterTax/miningHours,allInIskHour:cashNet/timeHours,
+   returnHome:!!profile.returnHome};
+};
 api.formatIsk=function(n,digits=0){return Number.isFinite(n)?new Intl.NumberFormat('en-US',{maximumFractionDigits:digits}).format(n):'—';};
 api.escape=function(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));};
 global.ICLogic=api;

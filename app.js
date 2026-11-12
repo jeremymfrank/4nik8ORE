@@ -10,7 +10,7 @@ const MAJOR_MARKET_REGIONS=[10000043,10000002,10000030,10000042,10000032];
 const FACTORY_JUPILUXE=Object.freeze({id:'factory-jupiluxe-v1',name:'Jupiluxe',url:'https://music.youtube.com/playlist?list=PLPvpJjBd_h4nG9C1K-nLrGWsdre_8kX9V',playlistId:'PLPvpJjBd_h4nG9C1K-nLrGWsdre_8kX9V'});
 const CACHE_TTL=300000; const memCache=new Map();
 const state={resource:'both',system:null,region:null,hub:'all',results:[],selected:null,lastRun:0,inProgress:false,runId:0,coverage:[],failed:0,routeToken:0,routeEstimates:new Map()};
-const ua='4NIK8-Industrial-Command-Preview/0.4.2';
+const ua='4NIK8-Industrial-Command-Preview/0.4.3';
 const esi='https://esi.evetech.net';
 const COMPAT_DATE='2025-12-16';
 function url(path){return esi+path.replace(/\/(?=\?|$)/,'')+(path.includes('?')?'&':'?')+'datasource=tranquility';}
@@ -97,19 +97,115 @@ function assembleRows(types,payload,regions){
  result.sort((a,b)=>Number(!!b.winner)-Number(!!a.winner)||(Number(b.winner?.quote.full||false)-Number(a.winner?.quote.full||false))||(b.winner?.quote.perM3||0)-(a.winner?.quote.perM3||0));
  return result;
 }
+
+// Mining profile data belongs to the user, not ESI. Published ESI market prices
+// can be combined with a measured rate, but ESI has no live laser-cycle feed.
+let miningObserved={ore:null,ice:null};
+let miningSession=null;
+const mineField=(id)=>{const v=$(id).value.trim();return v===''?null:Number(v);};
+function miningSnapshot(){
+ return {profileName:$('miningProfileName').value.trim().slice(0,56)||'High on Supply / Retriever',
+  oreYield:mineField('miningOreYield'),oreCycle:mineField('miningOreCycle'),oreModules:mineField('miningOreModules'),
+  iceUnits:mineField('miningIceUnits'),iceCycle:mineField('miningIceCycle'),iceModules:mineField('miningIceModules'),
+  uptimePct:mineField('miningUptime'),handlingMinutes:mineField('miningHandling'),returnHome:$('miningReturn').checked,
+  observedOreM3Hour:miningObserved.ore,observedIceM3Hour:miningObserved.ice,
+  sort:$('miningSort').value,session:miningSession?{startedAt:miningSession.startedAt,kind:miningSession.kind}:null};
+}
+function miningKind(item){return RESOURCES.ice.includes(item.name)?'ice':'ore';}
+function miningMetric(item,v){
+ if(!v||!v.estimate)return null;
+ return L.miningPerformance(item,v,miningSnapshot(),freightInputs(),miningKind(item));
+}
+function bestHourlyBuyer(item){
+ if(!Array.isArray(item?.variants))return null;
+ let best=null,highest=-Infinity;
+ for(const v of item.variants){const m=miningMetric(item,v);
+  if(m&&m.allInIskHour>highest){best=v;highest=m.allInIskHour;}
+ }
+ return best;
+}
+function effectiveBuyer(item){return $('miningSort').value==='hour'?(bestHourlyBuyer(item)||item.winner):item.winner;}
+function visibleOpportunities(){
+ const a=state.results.slice();
+ if($('miningSort').value==='hour')a.sort((x,y)=>{
+  const bx=bestHourlyBuyer(x),by=bestHourlyBuyer(y);
+  const mx=bx&&miningMetric(x,bx),my=by&&miningMetric(y,by);
+  return Number(!!my)-Number(!!mx) || (my?.allInIskHour??0)-(mx?.allInIskHour??0);
+ });
+ return a;
+}
+function showHours(value){
+ if(!Number.isFinite(value)||value<0)return '—';
+ const mins=Math.round(value*60);
+ return mins>=120? (mins/60).toFixed(1)+' h' : mins+' min';
+}
+function renderMiningPanel(){
+ const out=$('miningMetrics'),item=state.results.find(x=>x.name===state.selected)||visibleOpportunities().find(x=>x.winner);
+ if(!item?.winner){out.innerHTML='<p class="muted">Run a live market scan and select a resource. Mining performance is not priced from invented market values.</p>';return;}
+ const kind=miningKind(item),best=bestHourlyBuyer(item)||item.winner,m=miningMetric(item,best);
+ const profile=miningSnapshot(),rate=L.miningRate(profile,kind,item.volume/item.units);
+ if(!rate){out.innerHTML='<div class="rate-heading"><b>'+L.escape(item.name)+'</b><span>'+kind.toUpperCase()+' · NOT CALIBRATED</span></div><p class="muted">Enter your fitted '+(kind==='ore'?'strip miner m³/cycle and cycle seconds':'ice harvester units/cycle and cycle seconds')+', or time a real mining session. No imaginary ISK/hour is displayed.</p>';return;}
+ if(!m){out.innerHTML='<div class="rate-heading"><b>'+L.escape(item.name)+'</b><span>'+kind.toUpperCase()+' · '+rate.source.toUpperCase()+'</span></div><p class="muted">Production: <b>'+L.formatIsk(rate.m3Hour,1)+' m³/h</b>. All-in earnings require a full-load public buyer order and verified stargate route; wormhole exits and private structure docking are not verified.</p>';return;}
+ const flag=best.quote.locationId>=1000000000000?' · STRUCTURE ACCESS UNVERIFIED':'';
+ const market=MARKETS[best.region]||('REGION #'+best.region);
+ out.innerHTML='<div class="rate-heading"><b>'+L.escape(item.name)+' · '+L.escape(market)+'</b><span>'+L.escape(profile.profileName)+' · '+m.source.toUpperCase()+flag+'</span></div>'+
+  '<div class="metric-grid"><div class="metric-card"><small>MINING ONLY · ISK/H</small><strong>'+L.formatIsk(m.miningIskHour)+'</strong><span>After sales tax; ignores freight and handling time</span></div>'+
+  '<div class="metric-card best"><small>ALL-IN · ISK/H</small><strong>'+L.formatIsk(m.allInIskHour)+'</strong><span>Includes mining, handling and outbound/return hauling time</span></div></div>'+
+  '<div class="metric-details"><span>Production: <b>'+L.formatIsk(m.rateM3Hour,1)+' m³/h</b></span><span>Mining: <b>'+showHours(m.miningHours)+'</b></span><span>Hauling: <b>'+showHours(m.travelMinutes/60)+'</b></span><span>Handling: <b>'+showHours(m.handlingMinutes/60)+'</b></span><span>Total: <b>'+showHours(m.timeHours)+'</b></span><span>Net cash (excludes pilot time value): <b>'+L.formatIsk(m.cashNet)+' ISK</b></span></div>';
+}
+function miningRefresh(){
+ if(state.results.length){drawRows();renderMiningPanel();}
+ else renderMiningPanel();
+}
+function miningInit(){
+ const fields=['miningProfileName','miningOreYield','miningOreCycle','miningOreModules','miningIceUnits','miningIceCycle','miningIceModules','miningUptime','miningHandling','miningReturn','miningSort'];
+ for(const id of fields){$(id).addEventListener('change',()=>{settingsManager.schedule();miningRefresh();});}
+ function sessionClock(){
+  const el=$('miningSessionClock'),status=$('miningSessionStatus'),toggle=$('miningSessionToggle'),cancel=$('miningSessionCancel');
+  if(!miningSession){el.textContent='00:00:00';toggle.textContent='START TIMED SESSION';cancel.disabled=true;$('miningSessionKind').disabled=false;return;}
+  const elapsed=Math.max(0,Math.floor((Date.now()-miningSession.startedAt)/1000));
+  const pad=n=>String(n).padStart(2,'0');el.textContent=pad(Math.floor(elapsed/3600))+':'+pad(Math.floor(elapsed%3600/60))+':'+pad(elapsed%60);
+  toggle.textContent='END & CALIBRATE';cancel.disabled=false;$('miningSessionKind').value=miningSession.kind;$('miningSessionKind').disabled=true;
+  status.textContent='Timing '+miningSession.kind.toUpperCase()+' · Enter the mined m³ when finished, then END & CALIBRATE. Wall-clock time includes inactivity and app downtime.';
+ }
+ $('miningSessionToggle').addEventListener('click',()=>{
+  if(!miningSession){miningSession={startedAt:Date.now(),kind:$('miningSessionKind').value};$('miningSessionStatus').textContent='Mining timer started.';}
+  else {
+   const mined=Number($('miningSessionVolume').value),elapsedMs=Date.now()-miningSession.startedAt;
+   if(!(mined>0)||!(elapsedMs>=30000)){$('miningSessionStatus').textContent='Calibration needs a positive mined m³ amount and at least 30 seconds of timed mining.';return;}
+   const m3Hour=mined/(elapsedMs/3600000);
+   if(!Number.isFinite(m3Hour)||m3Hour<=0||m3Hour>1e9){$('miningSessionStatus').textContent='Mined volume or elapsed time is not valid.';return;}
+   const mode=miningSession.kind;miningObserved[mode]=m3Hour;miningSession=null;$('miningSessionVolume').value='';
+   $('miningSessionStatus').textContent=mode.toUpperCase()+' measured rate: '+L.formatIsk(m3Hour,1)+' m³/hour. Saved to Windows AppData. This includes actual idle time.';
+  }
+  sessionClock();settingsManager.schedule();miningRefresh();
+ });
+ $('miningSessionCancel').addEventListener('click',()=>{miningSession=null;$('miningSessionStatus').textContent='Timed calibration cancelled; saved production rates unchanged.';sessionClock();settingsManager.schedule();});
+ $('miningClearMeasured').addEventListener('click',()=>{const kind=$('miningSessionKind').value;miningObserved[kind]=null;$('miningSessionStatus').textContent=kind.toUpperCase()+' measured rate cleared; theoretical module input remains.';settingsManager.schedule();miningRefresh();});
+ sessionClock();setInterval(sessionClock,1000);renderMiningPanel();
+}
+
 function drawRows(){
  const el=$('opportunities');
  if(!state.results.length){el.innerHTML='<div class="placeholder">No item records available. Check the API status.</div>';return;}
  let ranking=0;
- el.innerHTML=state.results.map((item,idx)=>{
+ const displayed=visibleOpportunities();
+ el.innerHTML=displayed.map((item,idx)=>{
   if(!item.winner)return `<div class="op-card"><div class="rank">·</div><div class="op-main"><div class="op-name">${L.escape(item.name)}</div><div class="op-sub">${L.escape(item.error||'No executable public buy orders found for this sample load')}</div></div><div class="op-price"><strong>—</strong></div></div>`;
   ranking++;
-  const w=item.winner, full=w.quote.full, mark=w.form==='compressed'?'COMPRESSED':'RAW',v=w.estimate? w.estimate.net/item.volume : w.quote.perM3;
-  return `<div class="op-card ${state.selected===item.name?'selected':''}" data-item="${L.escape(item.name)}" role="button" tabindex="0" aria-label="Inspect ${L.escape(item.name)}"><div class="rank">${ranking}</div><div class="op-main"><div class="op-name">${L.escape(item.name)}</div><div class="op-sub">${mark} · ${L.escape(MARKETS[w.region]||state.system.regionName||'Other region')}${full?' · FULL LOAD':' · PARTIAL '+Math.round(w.quote.coverage*100)+'%'}</div></div><div class="op-price"><strong class="${full?'':'limited'}">${bestPriceDisplay(v)}</strong><small>ISK/m³ · ${w.estimate?'est. net':'gross (unrouted)'}</small></div></div>`;
+  const w=effectiveBuyer(item), full=w.quote.full, mark=w.form==='compressed'?'COMPRESSED':'RAW',v=w.estimate? w.estimate.net/item.volume : w.quote.perM3;
+  const performance=$('miningSort').value==='hour'?miningMetric(item,w):null;
+  const metricValue=$('miningSort').value==='hour'?(performance?L.formatIsk(performance.allInIskHour,0):'—'):bestPriceDisplay(v);
+  const metricUnit=$('miningSort').value==='hour'?(performance?'ISK/hour · all-in est.':'Yield / route unknown'):(w.estimate?'ISK/m³ · est. net':'ISK/m³ · gross (unrouted)');
+  return `<div class="op-card ${state.selected===item.name?'selected':''}" data-item="${L.escape(item.name)}" role="button" tabindex="0" aria-label="Inspect ${L.escape(item.name)}"><div class="rank">${ranking}</div><div class="op-main"><div class="op-name">${L.escape(item.name)}</div><div class="op-sub">${mark} · ${L.escape(MARKETS[w.region]||state.system.regionName||'Other region')}${full?' · FULL LOAD':' · PARTIAL '+Math.round(w.quote.coverage*100)+'%'}</div></div><div class="op-price"><strong class="${full?'':'limited'}">${metricValue}</strong><small>${metricUnit}</small></div></div>`;
  }).join('');
  el.querySelectorAll('[data-item]').forEach(node=>{const callback=()=>selectItem(node.dataset.item);node.addEventListener('click',callback);node.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();callback();}});});
- const leader=state.results.find(x=>x.winner);
- $('bestName').textContent=leader?.name||'No visible buy orders';$('bestPrice').textContent=leader?bestPriceDisplay(leader.winner.estimate?leader.winner.estimate.net/leader.volume:leader.winner.quote.perM3):'—';$('headlineUnit').textContent=leader?.winner?.estimate?'ISK / mined m³ · EST. NET':'ISK / mined m³ · GROSS';
+ const hourly=$('miningSort').value==='hour';
+ const leader=hourly?displayed.find(x=>bestHourlyBuyer(x)):displayed.find(x=>x.winner);
+ const lw=leader?effectiveBuyer(leader):null;
+ $('bestName').textContent=leader?.name||(hourly?'Calibrate ship yield':'No visible buy orders');
+ $('bestPrice').textContent=leader?(hourly?L.formatIsk(miningMetric(leader,lw).allInIskHour):bestPriceDisplay(lw.estimate?lw.estimate.net/leader.volume:lw.quote.perM3)):'—';
+ $('headlineUnit').textContent=hourly?'ISK / HOUR · ALL-IN EST.':leader?.winner?.estimate?'ISK / mined m³ · EST. NET':'ISK / mined m³ · GROSS';
  $('dataFootnote').textContent=leader?'Order books are live; net estimates subtract user-defined sales tax and freight costs where ESI stargate routes were verified. No PvP risk, compression fees or mining site availability included.':'No executable public buy orders for the selected sample load. Private structure orders are not included.';
 }
 async function runScan(force=false){
@@ -255,6 +351,7 @@ function selectItem(name){
  state.selected=item.name;drawRows();
  const token=++state.routeToken;
  renderFreight(item,token);
+ renderMiningPanel();
 }
 async function renderFreight(item,token){
  const container=$('haulDetails');
@@ -577,7 +674,7 @@ const settingsManager=(()=>{
   const n=Number(readLocal(keys.volume,'55'));
   return {schemaVersion:1,livery:readLocal(keys.livery,'neon'),
    radio:{volume:Number.isFinite(n)?Math.max(0,Math.min(100,n)):55,shuffle:readLocal(keys.shuffle,'0')==='1',channels:channels.slice(0,40),selectedChannelId:readLocal(keys.last,'')},
-   scanner:{system:$('systemInput').value.trim(),hub:$('hubSelect').value,resource:state.resource,cargo:Math.max(1,Math.trunc(+$('cargoVolume').value||31625))},haul:freightInputs()};
+   scanner:{system:$('systemInput').value.trim(),hub:$('hubSelect').value,resource:state.resource,cargo:Math.max(1,Math.trunc(+$('cargoVolume').value||31625))},haul:freightInputs(),mining:miningSnapshot()};
  }
  function apply(data){
   if(!data||data.schemaVersion!==1)return;
@@ -593,6 +690,17 @@ const settingsManager=(()=>{
    if(haul[key]!==undefined&&Number.isFinite(+haul[key])&&+haul[key]>=min&&+haul[key]<=max)$(id).value=haul[key];
   }
   if(['Safer','Shorter','LessSecure'].includes(haul.preference))$('haulRoutePref').value=haul.preference;
+  const mine=data.mining||{};
+  if(typeof mine.profileName==='string'&&mine.profileName.trim())$('miningProfileName').value=mine.profileName.slice(0,56);
+  for(const [id,key,min,max] of [['miningOreYield','oreYield',0,1000000],['miningOreCycle','oreCycle',0.1,10000],['miningOreModules','oreModules',1,16],['miningIceUnits','iceUnits',0,1000],['miningIceCycle','iceCycle',0.1,10000],['miningIceModules','iceModules',1,16],['miningUptime','uptimePct',1,100],['miningHandling','handlingMinutes',0,10000]]){
+   const v=mine[key];if(v===null||v===undefined||v===''){if(['miningOreYield','miningOreCycle','miningIceUnits','miningIceCycle'].includes(id))$(id).value='';continue;}
+   if(Number.isFinite(+v)&&+v>=min&&+v<=max)$(id).value=v;
+  }
+  if(typeof mine.returnHome==='boolean')$('miningReturn').checked=mine.returnHome;
+  if(['value','hour'].includes(mine.sort))$('miningSort').value=mine.sort;
+  for(const [key,field] of [['observedOreM3Hour','ore'],['observedIceM3Hour','ice']]){const v=mine[key];miningObserved[field]=(v!==null&&v!==undefined&&Number.isFinite(+v)&&+v>0)?+v:null;}
+  if(mine.session && ['ore','ice'].includes(mine.session.kind) && Number.isFinite(+mine.session.startedAt) && mine.session.startedAt>0 && mine.session.startedAt<=Date.now())miningSession={kind:mine.session.kind,startedAt:+mine.session.startedAt};
+  else miningSession=null;
   const scan=data.scanner||{};
   if(typeof scan.system==='string'&&scan.system)$('systemInput').value=scan.system;
   if(typeof scan.hub==='string'&&[...$('hubSelect').options].some(x=>x.value===scan.hub))$('hubSelect').value=scan.hub;
@@ -675,5 +783,5 @@ function liveryInit(){
  picker.addEventListener('change',()=>apply(picker.value));
  apply(chosen);
 }
-settingsManager.load().finally(()=>{liveryInit();radioInit();});
+settingsManager.load().finally(()=>{liveryInit();radioInit();miningInit();});
 })();

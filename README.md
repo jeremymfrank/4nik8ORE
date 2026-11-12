@@ -1,4 +1,4 @@
-# 4NIK8 ORE — Industrial Command (Preview v0.4.2)
+# 4NIK8 ORE — Industrial Command (Preview v0.4.3)
 
 **Local-only, single-user EVE Online mining-market prototype**, optimized for a **1080×1920 portrait side monitor**. Features the **CB ContraBand Radio** with saved YouTube Music / YouTube playlist channels.
 
@@ -87,8 +87,25 @@ EVE Online and YouTube are trademarks of their respective owners. This is an ind
 - Configurable shipment hold volume, estimated sales tax, cash hauling cost per jump, minutes per jump, pilot time value, and safer/shorter/less secure routing. Cash cost assumes intermediate empty returns between shipment loads (2 × trips − 1 legs); no estimates of piracy loss probability are made. The default cash cost is **0 ISK/jump** for self-hauling through ordinary stargates. Travel time remains included separately; no money cost is invented for stargate jumps. Existing saved cost overrides are preserved.
 - Settings, including new freight preferences, persist in `%LOCALAPPDATA%\4NIK8 ORE\Industrial Command\settings.json`. Fixes a v0.4.0 Windows settings validation mismatch for `ORE + ICE` and `AUTO` market scanning. The radio, playlist presets and theme remain unchanged.
 - No authenticated private-structure access, dynamic wormhole exits, mining sites, reprocessing fee calculations, or actual ship profile is implemented. ESI still needs testing on a Windows install.
+
 ## v0.4.2 - Own-hauler default
 
 - **Cash expense per jump defaults to 0 ISK** for 4NIK8-owned hauling on ordinary stargate routes. It is optional for courier fees, jump-freighter fuel estimates, or explicit out-of-pocket costs.
 - Travel time still contributes to route duration and can be assigned a pilot time value, but cash cost and time are kept separate.
 - Existing AppData freight settings are deliberately not overwritten by updates. If a prior installation has 45,000 or 50,000 ISK/jump saved, change that field to **0** once; the app will persist your choice.
+
+
+## v0.4.3 - Mining Performance (calibrated ISK/hour)
+
+The Mining Performance panel, underneath Freight Profit Analyzer, models **two separate production rates**: ore strip mining and ice harvesting. Its factory ship profile is **High on Supply / Retriever** with two mining modules; the yield and cycle time fields intentionally begin **blank** because actual rates depend on the fitted modules, trained skills, current boosts, implants, critical successes and resource type. ESI does not report live mining laser cycles or live cargo quantities.
+
+To calibrate either mode, enter the module's **effective m3/cycle and seconds per cycle** as shown in EVE, or press **START TIMED SESSION**, mine normally, and enter the actual number of m3 you produced before pressing **END & CALIBRATE**. Observed rates override module estimates, including the time your lasers were idle. The timer measures real wall-clock time; it stays running across app restarts and must be stopped with a mined volume. Ice mode uses actual ice units per cycle and raw item volume from ESI instead of incorrectly applying the ore yield.
+
+After the same cross-regional market scan, choose **ALL-IN ISK/HOUR** in Mining Performance. The Opportunity Board can rank only fully filled, route-verified quotes with a calibrated rate. There are two separate readings:
+
+- **Mining-only ISK/hour** = estimated gross buyer revenue minus configured sale tax, divided by mining hours. It does not include travel time.
+- **All-in ISK/hour** = estimated gross buyer revenue minus configured sale tax and explicit cash transport expenses, divided by mining hours + estimated outbound/return hauling hours + configurable handling hours. The optional final empty **Return to Origin** leg is on by default. Pilot time cost is deliberately not deducted in the numerator again because elapsed hours already appear in the denominator.
+
+No market prices are fabricated. The cash-cost default remains **0 ISK per jump**, and all settings, calibrated rates and an active session timestamp live in `%LOCALAPPDATA%\4NIK8 ORE\Industrial Command\settings.json` in the existing schema. Radio presets, Jupiluxe, shuffle, volume, and livery are unchanged.
+
+**Limitations:** No automatic ship skill/fitting import or EVE SSO in this release. The personal ESI mining ledger summarizes quantities by day/system/resource but does not include exact session minutes. This release deliberately requires one-time fit-value entry or a timer calibration instead of calling an unverified output 'actual'. Mining-site existence, local threats, critical bonuses not reflected in effective yield, residue, compression/refining costs, structure access, and wormhole exits remain unverified or excluded. The browser tests use synthetic ESI responses and do not prove live playability or actual EVE yield.

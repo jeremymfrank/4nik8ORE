@@ -60,6 +60,12 @@ Never label market price as a guaranteed executable payout; never label a market
 - Fetch NPC station names via public ESI; restricted Upwell structures remain unverified.
 - Price compressed cargo using the ESI physical volume of the compressed type; compare gross and estimated net, with user-defined tax, haul allowance and trip count.
 - Never claim mining-site availability, price PvP risk without evidence, or infer real ship cargo capacity from the target mined volume.
+
 ### v0.4.2 cash freight default
 
 Default monetary stargate hauling expense is 0 ISK/jump for own-ship hauling. Time is tracked separately. Existing saved user-defined charges remain unchanged during upgrades.
+
+
+### v0.4.3 Mining performance
+
+Implement separate ore/ice calibrated module profiles or timed-session rates (effective m3/hour), persist profiles and session state in the existing Windows AppData settings JSON, and rank route-verified full-load buyers by expected end-to-end ISK/hour without fabricating yields. Show mining-only vs all-in hours and include final return travel by default. Preserve the 0 ISK/jump self-haul default and radio/visual settings. Future versions can use CCP SSO and an accurate SDE dogma fitting model; those are not part of v0.4.3.

@@ -34,7 +34,7 @@
       <section class="profit panel">
         <div class="section-name"><span class="ordinal">02</span> OPPORTUNITY BOARD <span class="line"></span><span class="small-label">ORDER BOOK / ISK·M³</span></div>
         <div class="headline"><div><div class="muted smallcaps">BEST QUOTED OPPORTUNITY</div><div class="headline-name" id="bestName">Awaiting live data</div></div><div class="headline-value"><span id="bestPrice">—</span><small id="headlineUnit">ISK / mined m³ · GROSS</small></div></div>
-        <div class="notice" id="notice" role="status">Market profitability is NOT proof a deposit exists in your selected system. This scanner compares possible resources with public buyers across major regions. Net figures use configurable tax and freight allowances, NOT actual ship operating costs. Mining-site availability, combat risk and actual mining ISK/hour remain unknown.</div>
+        <div class="notice" id="notice" role="status">Live orders show where buyers exist, NOT whether a mining deposit exists in your system. Freight and mining rates are estimates based on your settings; PvP exposure, docking access and processing fees remain unverified.</div>
         <div class="sort-strip"><span>RESOURCE / FORM</span><span>BEST REGIONAL BUY ORDERS</span></div>
         <div id="opportunities" class="opportunity-list"><div class="placeholder"><span class="reticle">◎</span><strong>READY FOR DEPARTURE</strong><p>Choose an operating system and scan all major public trading regions in one pass.</p></div></div>
         <div class="footer-note" id="dataFootnote">No estimated or invented price data is shown.</div>
@@ -50,6 +50,44 @@
           <label class="field"><span>STARGATE ROUTE</span><select id="haulRoutePref"><option value="Safer">SAFER</option><option value="Shorter">SHORTER</option><option value="LessSecure">LESS SECURE</option></select></label>
         </div>
         <div id="haulDetails" class="detail-body"><p class="muted">A single market scan will automatically compare buyer stations, freight costs and stargate routes. Risk and site availability remain unverified.</p></div>
+      </section>
+      <section class="mining panel" id="miningPanel">
+        <div class="section-name"><span class="ordinal">04</span> MINING PERFORMANCE <span class="line"></span><span class="small-label">REAL RATES / REAL ISK·HOUR</span></div>
+        <div class="mining-intro">One ship profile feeds every resource in the market scan. Enter your fitted mining-cycle values once, or time a real session to calibrate an observed rate. No guessed Retriever performance.</div>
+        <div class="mining-profile-grid">
+          <label class="field mining-profile-name"><span>SHIP PROFILE</span><input type="text" id="miningProfileName" maxlength="56" value="High on Supply / Retriever" aria-label="Mining ship profile name"></label>
+          <label class="field"><span>UPTIME · % (THEORETICAL)</span><input type="number" id="miningUptime" min="1" max="100" step="1" value="100" title="Percentage of theoretical laser time spent mining. Not applied to measured session rates."></label>
+        </div>
+        <div class="mining-config">
+          <div class="mining-config-title"><span class="ore-glyph">⛏</span> ORE STRIP MINERS <small>Include fitting, skills and bursts in displayed yield</small></div>
+          <div class="mining-input-grid">
+            <label class="field"><span>YIELD PER MODULE · m³/CYCLE</span><input type="number" id="miningOreYield" min="0" max="1000000" step="any" placeholder="From fitting window"></label>
+            <label class="field"><span>CYCLE LENGTH · SECONDS</span><input type="number" id="miningOreCycle" min="0.1" max="10000" step="any" placeholder="From fitted module"></label>
+            <label class="field"><span>ACTIVE MINERS</span><input type="number" id="miningOreModules" min="1" max="16" step="1" value="2"></label>
+          </div>
+          <div class="mining-config-title ice-label">❄ ICE HARVESTERS <small>Separate profile; ore yield never used for ice</small></div>
+          <div class="mining-input-grid">
+            <label class="field"><span>ICE UNITS / MODULE CYCLE</span><input type="number" id="miningIceUnits" min="0" max="1000" step="any" placeholder="From fitting window"></label>
+            <label class="field"><span>ICE CYCLE · SECONDS</span><input type="number" id="miningIceCycle" min="0.1" max="10000" step="any" placeholder="From fitted module"></label>
+            <label class="field"><span>ACTIVE HARVESTERS</span><input type="number" id="miningIceModules" min="1" max="16" step="1" value="2"></label>
+          </div>
+        </div>
+        <div class="mining-options">
+          <label class="field"><span>LOAD / PROCESS / UNLOAD · MINUTES</span><input type="number" id="miningHandling" min="0" max="10000" value="0" step="1" title="Total handling time for the priced sample shipment"></label>
+          <label class="field"><span>OPPORTUNITY BOARD SORT</span><select id="miningSort"><option value="value">NET ISK / MINED m³</option><option value="hour">ALL-IN ISK / HOUR</option></select></label>
+          <label class="check-field"><input id="miningReturn" type="checkbox" checked> Return to operating system after final delivery</label>
+        </div>
+        <div class="mining-metrics" id="miningMetrics" aria-live="polite"><p class="muted">Scan markets and select a resource. Mining ISK/hour becomes available after one yield or session calibration.</p></div>
+        <div class="mining-session">
+          <div class="mining-session-heading"><strong>CALIBRATE WITH A REAL MINING SESSION</strong><span id="miningSessionClock">00:00:00</span></div>
+          <div class="mining-session-row">
+            <label class="field"><span>RESOURCE</span><select id="miningSessionKind"><option value="ore">ORE</option><option value="ice">ICE</option></select></label>
+            <label class="field"><span>TOTAL MINED · m³</span><input type="number" id="miningSessionVolume" min="1" max="1000000000" step="any" placeholder="Enter after mining"></label>
+          </div>
+          <div class="mining-session-actions"><button id="miningSessionToggle" type="button">START TIMED SESSION</button><button id="miningSessionCancel" type="button" disabled>CANCEL</button><button id="miningClearMeasured" type="button" title="Remove the measured rate for the selected ore or ice mode">RESET MEASURED RATE</button></div>
+          <div id="miningSessionStatus" class="mining-session-status" role="status">No session running. Timer measures wall-clock time; ESI does not provide live cargo or exact session minutes.</div>
+        </div>
+        <p class="mining-disclaimer">Projected ISK/hour is not historical wallet profit. It uses calibrated production, public buyer orders, configured sales tax, verified stargate routes and handling time. Compression costs, travel to a mining site, residue, critical successes not reflected in your yield input, local ore availability, structure docking, taxes beyond the selected sale tax and ship-loss risk are excluded. When a measured rate is available it overrides the theoretical cycle rate.</p>
       </section>
       <section class="radio panel">
         <div class="radio-header"><div class="radio-mark" aria-hidden="true">◉</div><div class="grow"><div class="eyebrow">CH 19 / 4NIK8 ORE ENTERTAINMENT</div><h2>CB ContraBand Radio</h2><div class="radio-tagline">If CONCORD asks, you ain't heard nothin'.</div></div><button class="radio-collapse" id="radioCollapse" aria-expanded="true" title="Collapse radio">▾</button></div>
@@ -76,7 +114,7 @@
           <audio id="audioPlayer" preload="none"></audio>
         </div>
       </section>
-      <footer class="bottom"><span>4NIK8 ORE / INDUSTRIAL RECLAMATION</span><span class="version">PREVIEW v0.4.2 · LOCAL WINDOWS</span></footer>
+      <footer class="bottom"><span>4NIK8 ORE / INDUSTRIAL RECLAMATION</span><span class="version">PREVIEW v0.4.3 · LOCAL WINDOWS</span></footer>
     </main>
   </div>
   <script src="logic.js"></script>

@@ -204,3 +204,41 @@ body{background:radial-gradient(ellipse at 58% 0%,#373023 0%,transparent 28%),re
 .freight-costs>div span{color:var(--muted)}
 .freight-disclaimer{line-height:1.55;margin-top:12px}
 @media(max-width:680px){.freight-settings{grid-template-columns:repeat(2,minmax(0,1fr))}.freight-summary,.freight-destination-top,.freight-destination-bottom{align-items:flex-start;flex-direction:column}.freight-net{text-align:left}.freight-profit{text-align:left}.freight-destinations{max-height:none}}
+
+
+/* v0.4.3 calibrated miner's console */
+.mining{border-top-color:var(--ice);overflow:hidden}
+:root[data-livery="neon"] .mining{border-top-color:#ffaf59}
+.mining-intro,.mining-disclaimer{font-size:11px;line-height:1.6;color:var(--muted);margin:0 0 14px}
+.mining-profile-grid,.mining-input-grid,.mining-options,.mining-session-row{display:grid;gap:9px;grid-template-columns:repeat(3,minmax(0,1fr))}
+.mining-profile-grid{grid-template-columns:2fr 1fr;margin-bottom:12px}
+.mining-profile-name{min-width:0}
+.mining-profile-grid input,.mining-input-grid input,.mining-options input,.mining-options select,.mining-session input,.mining-session select{font-size:12px;padding:9px 8px;min-height:36px}
+.mining-config{padding:12px;margin:0 0 12px;border:1px solid var(--edge);border-radius:6px;background:linear-gradient(135deg,#20292b,#222028)}
+.mining-config-title{display:flex;gap:6px;align-items:baseline;color:var(--amber);font-weight:900;letter-spacing:.5px;font-size:11px;margin-bottom:10px}
+.mining-config-title small{margin-left:auto;text-align:right;color:var(--muted);font-size:9px;font-weight:400;letter-spacing:0}
+.mining-config-title.ice-label{color:var(--ice);margin:15px 0 10px;padding-top:12px;border-top:1px solid var(--edge)}
+.mining-input-grid .field>span,.mining-options .field>span,.mining-session .field>span{font-size:9px;letter-spacing:.2px}
+.mining-options{grid-template-columns:repeat(2,minmax(0,1fr));padding:0 2px 12px}
+.mining-options .check-field{grid-column:span 2;display:flex;align-items:center;gap:8px;cursor:pointer;font-size:11px;color:var(--text)}
+.check-field input{width:17px;height:17px;accent-color:var(--amber)}
+.mining-metrics{padding:12px;border:1px solid var(--edge2);border-radius:6px;background:linear-gradient(125deg,#282335,#1b2830);margin-bottom:13px;min-height:110px}
+.mining-metrics .rate-heading{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--muted);margin-bottom:10px}
+.mining-metrics .metric-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.mining-metrics .metric-card{border:1px solid var(--edge);border-radius:5px;padding:12px;background:#101b22aa}
+.mining-metrics .metric-card.best{border-color:var(--green)}
+.mining-metrics .metric-card small{display:block;font-size:9px;letter-spacing:.5px;color:var(--muted)}
+.mining-metrics .metric-card strong{display:block;color:var(--green);font-size:clamp(17px,2.5vw,25px);margin:8px 0 4px;font-variant-numeric:tabular-nums}
+.mining-metrics .metric-card>span{color:var(--muted);font-size:10px}
+.mining-metrics .metric-details{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:11px;color:var(--muted);font-size:10px}
+.mining-session{padding:12px;background:#171b22;border:1px solid var(--edge);border-radius:6px;margin-bottom:12px}
+.mining-session-heading{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;font-size:10px;letter-spacing:.6px;color:var(--text)}
+#miningSessionClock{font-family:Consolas,monospace;font-size:15px;color:var(--amber);font-weight:800;font-variant-numeric:tabular-nums}
+.mining-session-row{grid-template-columns:1fr 2fr;margin-bottom:10px}
+.mining-session-actions{display:flex;flex-wrap:wrap;gap:6px}
+.mining-session-actions button{border:1px solid var(--edge2);background:#2a3031;color:var(--text);cursor:pointer;border-radius:4px;padding:9px 11px;font-size:10px;font-weight:800}
+#miningSessionToggle{background:var(--amber);color:#131617;border-color:var(--amber)}
+.mining-session-actions button:disabled{opacity:.35;cursor:not-allowed}
+.mining-session-status{color:var(--muted);line-height:1.5;font-size:10px;margin-top:9px}
+.mining-disclaimer{margin:0}
+@media(max-width:510px){.mining-input-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.mining-config-title{display:block}.mining-config-title small{display:block;margin:5px 0}.mining-options{grid-template-columns:1fr}.mining-options .check-field{grid-column:1}.mining-metrics .metric-card strong{font-size:18px}}

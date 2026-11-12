@@ -22,7 +22,7 @@ catch {
     Write-Host 'IMPORTANT: close the previous server window before running an updated version.'
     exit 1
 }
-Write-Host "4NIK8 Industrial Command v0.4.2 - $prefix" -ForegroundColor Cyan
+Write-Host "4NIK8 Industrial Command v0.4.3 - $prefix" -ForegroundColor Cyan
 Write-Host "Saved channels and preferences: $settingsFile"
 Write-Host 'Keep this window running. Ctrl+C closes the application server.'
 Start-Process $prefix
@@ -142,10 +142,49 @@ try {
                   }
                   if (@('Safer','Shorter','LessSecure') -contains [string]$doc.haul.preference) {$haul.preference=[string]$doc.haul.preference}
                }
+               # Optional v0.4.3 mining profile; older settings files are accepted.
+               # Blank cycle/yield fields remain null, so the app never fabricates production.
+               $mining = [ordered]@{
+                   profileName='High on Supply / Retriever';oreYield=$null;oreCycle=$null;oreModules=2;
+                   iceUnits=$null;iceCycle=$null;iceModules=2;uptimePct=100;handlingMinutes=0;
+                   returnHome=$true;observedOreM3Hour=$null;observedIceM3Hour=$null;
+                   sort='value';session=$null
+               }
+               if ($null -ne $doc.mining) {
+                   $pName = [string]$doc.mining.profileName
+                   if ($pName.Length -ge 1 -and $pName.Length -le 56) { $mining.profileName=$pName }
+                   foreach ($property in @('oreYield','oreCycle','oreModules','iceUnits','iceCycle','iceModules','uptimePct','handlingMinutes','observedOreM3Hour','observedIceM3Hour')) {
+                       $v = $doc.mining.$property
+                       if ($null -eq $v -or [string]$v -eq '') { continue }
+                       $n = 0.0
+                       $culture = [System.Globalization.CultureInfo]::InvariantCulture
+                       $style = [System.Globalization.NumberStyles]::Float
+                       if (-not [double]::TryParse([string]$v,$style,$culture,[ref]$n)) { throw 'Invalid mining value' }
+                       $limit = switch ($property) { 'oreYield' {1000000} 'oreCycle' {10000} 'oreModules' {16} 'iceUnits' {1000} 'iceCycle' {10000} 'iceModules' {16} 'uptimePct' {100} 'handlingMinutes' {10000} 'observedOreM3Hour' {1000000000} 'observedIceM3Hour' {1000000000} }
+                       $min = switch ($property) { 'oreCycle' {0.1} 'iceCycle' {0.1} 'oreModules' {1} 'iceModules' {1} 'uptimePct' {1} 'observedOreM3Hour' {0.01} 'observedIceM3Hour' {0.01} default {0} }
+                       if ($n -lt $min -or $n -gt $limit) { throw 'Mining setting out of range' }
+                       if ($property -in @('oreModules','iceModules') -and $n -ne [Math]::Floor($n)) { throw 'Mining module count must be an integer' }
+                       $mining[$property] = $n
+                   }
+                   if ($null -ne $doc.mining.returnHome) {
+                       if ($doc.mining.returnHome -isnot [bool]) { throw 'Invalid return-to-origin flag' }
+                       $mining.returnHome=[bool]$doc.mining.returnHome
+                   }
+                   if (@('value','hour') -contains [string]$doc.mining.sort) { $mining.sort=[string]$doc.mining.sort }
+                   if ($null -ne $doc.mining.session) {
+                       $kind = [string]$doc.mining.session.kind
+                       $st = 0.0
+                       if (@('ore','ice') -contains $kind -and
+                           [double]::TryParse([string]$doc.mining.session.startedAt,[System.Globalization.NumberStyles]::Float,[System.Globalization.CultureInfo]::InvariantCulture,[ref]$st) -and
+                           $st -gt 0 -and $st -lt 9000000000000) {
+                           $mining.session=[ordered]@{startedAt=$st;kind=$kind}
+                       }
+                   }
+               }
                $clean = [ordered]@{
                   schemaVersion=1; livery=[string]$doc.livery;
                   radio=[ordered]@{volume=$volume;shuffle=$shuffle;channels=$cleanChannels;selectedChannelId=$selection};
-                  scanner=[ordered]@{system=$sys;hub=$hub;resource=$resource;cargo=$cargo};haul=$haul
+                  scanner=[ordered]@{system=$sys;hub=$hub;resource=$resource;cargo=$cargo};haul=$haul;mining=$mining
                }
                $json = ConvertTo-Json -InputObject $clean -Depth 8 -Compress
                if (-not (Test-Path -LiteralPath $dataRoot)) { [System.IO.Directory]::CreateDirectory($dataRoot) | Out-Null }
