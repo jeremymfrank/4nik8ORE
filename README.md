@@ -1,4 +1,4 @@
-# 4NIK8 ORE — Industrial Command (Preview v0.5.1)
+# 4NIK8 ORE — Industrial Command (Preview v0.5.2)
 
 **Local-only, single-user EVE Online mining-market prototype**, optimized for a **1080×1920 portrait side monitor**. Features the **CB ContraBand Radio** with saved YouTube Music / YouTube playlist channels.
 
@@ -161,3 +161,14 @@ The initial eight hulls were never a complete list of EVE ships. **06 SHIP FITTI
 The ship library holds up to 128 locally saved fits, while the searchable EVE ship catalog is kept separately; having hundreds of catalog hulls does not fill the saved-profile limit. Fitted skill/implant stats still require entered overrides when ESI has only public hull data. Some unpublished NPC/developer hull types may be listed by the public ship category but will be rejected when selected if their type is not published; the catalog is not a claim that every ship is flyable.
 
 Deterministic ship math tests remain available through node tests/ship.test.js; full live ESI catalog loading and the Windows UI still require on-machine testing.
+
+
+## v0.5.2: Automatic ESI ship list and complete CSV export
+
+The Ship Fitting Library now **automatically requests the complete public Ship-category list** from CCP's live ESI when no valid cached catalog exists or the prior catalog is more than seven days old. It downloads category 6's groups, discovers all type IDs from published groups, and resolves their names via bounded batches of ESI POST requests. Fetches are nonblocking, so normal dashboard controls and CB radio remain usable during initialization. Public ESI needs an internet connection but does not require character authentication.
+
+When an ESI name batch contains an unresolvable or unpublished type ID and returns 400/404, the loader bisects that batch and retries the valid subsets. Type IDs that still cannot be named remain in the catalog as **UNRESOLVED TYPE #ID**, with their ship class. This preserves every returned type ID without falsely claiming that an unidentified hull is flyable. Other request failures flag a partial catalog and do not overwrite a previously complete cache. The UI displays the number of loaded ship-category type IDs, groups, and unresolved names, and allows a manual refresh.
+
+**EXPORT FULL LIST · CSV** downloads every indexed type ID, hull name (or unresolved-ID placeholder) and group. The export contains all fetched rows, not just the first 80 visible search results. File name: `4nik8-eve-ship-catalog-YYYY-MM-DD.csv`. The complete catalog is kept separate from the per-user saved fitting library; no personal ship names or fittings are published.
+
+Verified locally with mocked ESI responses via `node tests/ship_catalog.test.js`, including automatic load, caching, independent selection, CSV rows, and a failing-name-batch split/retry. Existing ship math tests also pass via `node tests/ship.test.js`. **The real ESI download and precise current number of hull IDs have not been verified in this environment**; inspect the in-app count or CSV after launching the updated version on a PC with ESI access.
