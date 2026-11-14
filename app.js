@@ -213,7 +213,7 @@ function shipMenus(){
 function shipReadouts(){
  for(const role of Object.keys(SHIP_SELECTS)){
   const p=chosenShip(role),stats=p&&L.shipStats(p,role==='trade'?'general':'ore');
-  $(role+'ShipReadout').textContent=p?(stats?.capacity?L.formatIsk(stats.capacity,1)+' m³':'HOLD UNCONFIGURED')+
+  $(role+'ShipReadout').textContent=p?(stats?.capacity?L.formatIsk(stats.capacity,1)+' m³':'LOADING HULL…')+
    ' · '+(stats?.align?L.formatIsk(stats.align,1)+'s align':'ALIGN UNCONFIGURED')+
    ' · '+(stats?.warp?L.formatIsk(stats.warp,2)+' AU/s':'WARP UNCONFIGURED'):
    'Manual capacity / minutes per jump';
@@ -390,7 +390,8 @@ function shipInit(){
    if(shipLibrary.length>=128)throw Error('Maximum 128 saved fits. Remove an unused custom profile first.');
    const mods=fit.modules.map(x=>String(x).toLowerCase());
    const p={id:'fit-'+Date.now().toString(36),name:fit.name.slice(0,64),hull:fit.hull.slice(0,64),
-    base:{},modules:mods,cargoSkillPct:0,specialHoldSkillPct:0};
+    base:{},modules:mods,cargoSkillPct:0,specialHoldSkillPct:0,
+    exactCapacity:0,exactCapacityKind:'general',exactAlign:0,exactWarp:0};
    if(!validShip(p))throw Error('The imported fit contains unsupported modifiers or an invalid name');
    shipMessage('Reading '+fit.hull+' hull data from ESI and saving the fit…');
    await fetchHull(p);
@@ -408,6 +409,12 @@ function shipInit(){
   shipMessage('Checking CCP ESI for '+p.hull+' base hull data…');
   await ensureHullAttributes(p,true);
  });
+ // Hydrate every selected ship, not all unused factory profiles.
+ const active=[...new Set(Object.values(selectedShips).filter(id=>id!=='manual'))];
+ for(const id of active){
+  const p=shipLibrary.find(s=>s.id===id);
+  if(p&&(!p.base?.warp||!p.base?.mass||!p.base?.inertia))ensureHullAttributes(p);
+ }
 }
 
 const esi='https://esi.evetech.net';
