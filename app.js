@@ -10,10 +10,10 @@ const MAJOR_MARKET_REGIONS=[10000043,10000002,10000030,10000042,10000032];
 const FACTORY_JUPILUXE=Object.freeze({id:'factory-jupiluxe-v1',name:'Jupiluxe',url:'https://music.youtube.com/playlist?list=PLfXw8cc_z-vY&si=Dl5vr0dXqf0enefV',playlistId:'PLfXw8cc_z-vY'});
 const CACHE_TTL=300000; const memCache=new Map();
 const state={resource:'both',system:null,region:null,hub:'all',results:[],selected:null,lastRun:0,inProgress:false,runId:0,coverage:[],failed:0,routeToken:0,routeEstimates:new Map()};
-const ua='4NIK8-Industrial-Command-Preview/0.5.0';
+const ua='4NIK8-Industrial-Command-Preview/0.5.1';
 
 const FACTORY_SHIPS=[
- {id:'retriever',name:'High on Supply',hull:'Retriever'},
+ {id:'retriever',name:'Retriever',hull:'Retriever'},
  {id:'tayra',name:'Tayra',hull:'Tayra'},
  {id:'miasmos',name:'Miasmos',hull:'Miasmos'},
  {id:'kryos',name:'Kryos',hull:'Kryos'},
@@ -32,8 +32,122 @@ function shipOptions(role,kind){
  const manual=Math.max(1,Math.min(1e7,+$('haulCapacity').value||31625));
  return {ship:stats?.capacity&&stats?.align&&stats?.warp?ship:null,capacity:stats?.capacity||manual,cargoKind:kind};
 }
+
+const SHIP_CATALOG_KEY='4nik8.ship.catalog.v1';
+const SHIP_CATALOG_AGE=7*86400000;
+let shipCatalog=[],catalogLoading=false,catalogComplete=false;
+function validCatalogEntry(x){
+ return Number.isInteger(+x?.id)&&+x.id>0&&+x.id<1e9&&
+  typeof x.name==='string'&&x.name.length>0&&x.name.length<=100&&
+  typeof x.group==='string'&&x.group.length>0&&x.group.length<=100;
+}
+function loadCachedShipCatalog(){
+ try{
+  const cache=JSON.parse(localStorage.getItem(SHIP_CATALOG_KEY)||'null');
+  if(cache?.version!==1||!(Date.now()-cache.at<SHIP_CATALOG_AGE)||
+   !Array.isArray(cache.ships)||cache.ships.length<10||cache.ships.length>10000||
+   !cache.ships.every(validCatalogEntry))return;
+  shipCatalog=cache.ships;catalogComplete=true;
+ }catch(_){}
+}
+function catalogStatus(text){$('shipCatalogStatus').textContent=text;}
+function catalogMatches(){
+ const query=$('shipCatalogSearch').value.trim().toLowerCase();
+ return shipCatalog.filter(s=>!query||s.name.toLowerCase().includes(query)||s.group.toLowerCase().includes(query));
+}
+function refreshCatalogMatches(){
+ const matches=catalogMatches(),box=$('shipCatalogResults'),current=box.value;
+ box.innerHTML=matches.slice(0,80).map(s=>'<option value="'+s.id+'">'+L.escape(s.name)+' · '+L.escape(s.group)+'</option>').join('');
+ box.disabled=!matches.length;
+ if(matches.some(s=>String(s.id)===current))box.value=current;
+ $('shipCatalogAdd').disabled=!matches.length||catalogLoading;
+ const suffix=matches.length>80?' · first 80 shown (refine search)':'';
+ if(shipCatalog.length)catalogStatus(shipCatalog.length.toLocaleString()+
+   ' ship-category hulls indexed'+(catalogComplete?' · cached locally':' · partial catalog; refresh to complete')+
+   ' · '+matches.length+' matching'+suffix);
+}
+async function fetchShipCatalog(){
+ if(catalogLoading)return;
+ catalogLoading=true;$('shipCatalogLoad').disabled=true;$('shipCatalogAdd').disabled=true;
+ let failures=0;
+ try{
+  catalogStatus('Loading EVE ship group list…');
+  const category=await request('/universe/categories/6/',{},86400000,true);
+  if(!Array.isArray(category?.groups)||category.groups.length<1||category.groups.length>500)throw Error('Unexpected ship category response');
+  const groups=[];
+  let done=0;
+  await pool(category.groups.map(id=>async()=>request('/universe/groups/'+id+'/',{},86400000)),5,(_,result,error)=>{
+   done++;if(error)failures++;
+   else if(result?.category_id===6&&result.published!==false&&Array.isArray(result.types)){
+    groups.push(result);
+   }
+   catalogStatus('Indexing ship groups '+done+'/'+category.groups.length+(failures?' · '+failures+' failed':''));
+  });
+  const ids=new Map();
+  for(const group of groups){
+   for(const id of group.types){
+    if(Number.isInteger(+id)&&+id>0&&!ids.has(+id))ids.set(+id,group.name||'Ship');
+   }
+  }
+  const numbers=[...ids.keys()];
+  if(!numbers.length)throw Error('No ship type IDs returned by EVE');
+  const chunks=[];for(let i=0;i<numbers.length;i+=400)chunks.push(numbers.slice(i,i+400));
+  const matched=[];
+  done=0;
+  await pool(chunks.map(group=>async()=>request('/universe/names/',{method:'POST',body:JSON.stringify(group)},86400000)),3,(_,result,error)=>{
+   done++;if(error||!Array.isArray(result))failures++;
+   else for(const row of result)if(ids.has(+row.id)&&typeof row.name==='string'&&row.name.trim()&&row.name.length<=100)
+    matched.push({id:+row.id,name:row.name.trim(),group:String(ids.get(+row.id)).slice(0,100)});
+   catalogStatus('Resolving EVE ship names '+done+'/'+chunks.length+(failures?' · '+failures+' failed':''));
+  });
+  const catalog=[...new Map(matched.map(s=>[s.id,s])).values()].sort((a,b)=>a.name.localeCompare(b.name));
+  if(!catalog.length)throw Error('No hull names resolved from ship groups');
+  if(failures===0){
+   shipCatalog=catalog;catalogComplete=true;
+   try{localStorage.setItem(SHIP_CATALOG_KEY,JSON.stringify({version:1,at:Date.now(),ships:catalog}));}catch(_){}
+  }else if(!shipCatalog.length){
+   shipCatalog=catalog;catalogComplete=false;
+  }
+  shipMenus();refreshCatalogMatches();
+  if(failures)catalogStatus('Ship catalog refresh incomplete: '+failures+' ESI request(s) failed. '+shipCatalog.length+
+   ' hulls available; retry to refresh. Existing complete cache retained when available.');
+ }catch(error){catalogStatus('Ship catalog unavailable · '+error.message+
+  '. You can still enter an exact EVE hull name and fetch it directly.');}
+ finally{catalogLoading=false;$('shipCatalogLoad').disabled=false;refreshCatalogMatches();}
+}
+async function addShipFromCatalog(id){
+ const entry=shipCatalog.find(s=>s.id===+id);
+ if(!entry)throw Error('Choose a catalog ship first');
+ let ship=shipLibrary.find(p=>p.typeId===entry.id||p.hull.toLowerCase()===entry.name.toLowerCase());
+ if(!ship){
+  if(shipLibrary.length>=128)throw Error('Saved fitting library has reached 128 profiles');
+  ship={id:'hull-'+entry.id,name:entry.name,hull:entry.name,typeId:entry.id,base:{},modules:[]};
+  await fetchHull(ship);
+  shipLibrary.push(ship);
+ }else if(!ship.base?.warp){
+  ship.typeId=entry.id;await fetchHull(ship);
+ }
+ shipMenus();
+ $('shipLibrarySelect').value=ship.id;showShipEditor();settingsManager.schedule();
+ shipMessage('Ready: '+ship.hull+'. Default profile uses the hull name; custom fit names are optional.');
+ return ship;
+}
+function shipCatalogInit(){
+ loadCachedShipCatalog();shipMenus();refreshCatalogMatches();
+ $('shipCatalogSearch').addEventListener('input',refreshCatalogMatches);
+ $('shipCatalogLoad').addEventListener('click',fetchShipCatalog);
+ $('shipCatalogAdd').addEventListener('click',async()=>{
+  const btn=$('shipCatalogAdd');btn.disabled=true;
+  try{await addShipFromCatalog($('shipCatalogResults').value);}
+  catch(e){shipMessage('Could not add ship · '+e.message);}
+  finally{refreshCatalogMatches();}
+ });
+}
 function shipMenus(){
- const options='<option value="manual">MANUAL / LEGACY</option>'+shipLibrary.map(s=>'<option value="'+L.escape(s.id)+'">'+L.escape(s.name)+' · '+L.escape(s.hull)+'</option>').join('');
+ const saved='<optgroup label="Saved ship profiles">'+shipLibrary.map(s=>'<option value="'+L.escape(s.id)+'">'+L.escape(s.name)+' · '+L.escape(s.hull)+'</option>').join('')+'</optgroup>';
+ const addable=shipCatalog.filter(s=>!shipLibrary.some(p=>p.typeId===s.id||p.hull.toLowerCase()===s.name.toLowerCase()));
+ const all=addable.length?'<optgroup label="EVE ship catalog · select to add">'+addable.map(s=>'<option value="catalog:'+s.id+'">'+L.escape(s.name)+' · '+L.escape(s.group)+'</option>').join('')+'</optgroup>':'';
+ const options='<option value="manual">MANUAL / LEGACY</option>'+saved+all;
  for(const [role,id] of Object.entries(SHIP_SELECTS)){
   $(id).innerHTML=options;$(id).value=shipLibrary.some(s=>s.id===selectedShips[role])?selectedShips[role]:'manual';
   selectedShips[role]=$(id).value;
@@ -239,7 +353,7 @@ let miningObserved={ore:null,ice:null};
 let miningSession=null;
 const mineField=(id)=>{const v=$(id).value.trim();return v===''?null:Number(v);};
 function miningSnapshot(){
- return {profileName:$('miningProfileName').value.trim().slice(0,56)||'High on Supply / Retriever',
+ return {profileName:$('miningProfileName').value.trim().slice(0,56)||'Retriever',
   oreYield:mineField('miningOreYield'),oreCycle:mineField('miningOreCycle'),oreModules:mineField('miningOreModules'),
   iceUnits:mineField('miningIceUnits'),iceCycle:mineField('miningIceCycle'),iceModules:mineField('miningIceModules'),
   uptimePct:mineField('miningUptime'),handlingMinutes:mineField('miningHandling'),returnHome:$('miningReturn').checked,
