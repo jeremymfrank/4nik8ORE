@@ -22,7 +22,7 @@ catch {
     Write-Host 'IMPORTANT: close the previous server window before running an updated version.'
     exit 1
 }
-Write-Host "4NIK8 Industrial Command v0.5.0 - $prefix" -ForegroundColor Cyan
+Write-Host "4NIK8 Industrial Command v0.5.1 - $prefix" -ForegroundColor Cyan
 Write-Host "Saved channels and preferences: $settingsFile"
 Write-Host 'Keep this window running. Ctrl+C closes the application server.'
 Start-Process $prefix
@@ -145,7 +145,7 @@ try {
                # Optional v0.4.3 mining profile; older settings files are accepted.
                # Blank cycle/yield fields remain null, so the app never fabricates production.
                $mining = [ordered]@{
-                   profileName='High on Supply / Retriever';oreYield=$null;oreCycle=$null;oreModules=2;
+                   profileName='Retriever';oreYield=$null;oreCycle=$null;oreModules=2;
                    iceUnits=$null;iceCycle=$null;iceModules=2;uptimePct=100;handlingMinutes=0;
                    returnHome=$true;observedOreM3Hour=$null;observedIceM3Hour=$null;
                    sort='value';session=$null
@@ -206,7 +206,7 @@ try {
                $ships = [ordered]@{library=@();selections=[ordered]@{mining='retriever';freight='manual';ore='manual';trade='manual'}}
                if ($null -ne $doc.ships) {
                   $submitted = @($doc.ships.library)
-                  if ($submitted.Count -gt 32) { throw 'Too many ship profiles' }
+                  if ($submitted.Count -gt 128) { throw 'Too many ship profiles' }
                   $usedIds = @{}
                   $cleanShips = @()
                   $allowedModules = @('expanded cargohold i','expanded cargohold ii','cargohold optimization i','cargohold optimization ii',
