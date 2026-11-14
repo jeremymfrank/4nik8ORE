@@ -30,7 +30,7 @@ function chosenShip(role){return shipLibrary.find(s=>s.id===selectedShips[role])
 function shipOptions(role,kind){
  const ship=chosenShip(role),stats=ship&&L.shipStats(ship,kind);
  const manual=Math.max(1,Math.min(1e7,+$('haulCapacity').value||31625));
- return {ship:stats?.align&&stats?.warp?ship:null,capacity:stats?.capacity||manual,cargoKind:kind};
+ return {ship:stats?.capacity&&stats?.align&&stats?.warp?ship:null,capacity:stats?.capacity||manual,cargoKind:kind};
 }
 function shipMenus(){
  const options='<option value="manual">MANUAL / LEGACY</option>'+shipLibrary.map(s=>'<option value="'+L.escape(s.id)+'">'+L.escape(s.name)+' · '+L.escape(s.hull)+'</option>').join('');
@@ -51,7 +51,7 @@ function shipReadouts(){
    ' · '+(stats?.warp?L.formatIsk(stats.warp,2)+' AU/s':'WARP UNCONFIGURED'):
    'Manual capacity / minutes per jump';
  }
- $('haulCapacity').readOnly=!!chosenShip('freight');
+ $('haulCapacity').readOnly=!!L.shipStats(chosenShip('freight'),'ore')?.capacity;
 }
 function showShipEditor(){
  const p=shipLibrary.find(s=>s.id===$('shipLibrarySelect').value);
@@ -59,7 +59,7 @@ function showShipEditor(){
  $('shipName').value=p.name;$('shipHull').value=p.hull;
  for(const [key,id] of Object.entries(SHIP_BASE_FIELDS))$(id).value=p.base?.[key]||0;
  $('shipCargoSkill').value=p.cargoSkillPct||0;$('shipHoldSkill').value=p.specialHoldSkillPct||0;
- $('shipExactCapacity').value=p.exactCapacity||'';$('shipExactAlign').value=p.exactAlign||'';$('shipExactWarp').value=p.exactWarp||'';
+ $('shipExactCapacity').value=p.exactCapacity||'';$('shipExactKind').value=p.exactCapacityKind||'general';$('shipExactAlign').value=p.exactAlign||'';$('shipExactWarp').value=p.exactWarp||'';
  $('shipModules').value=(p.modules||[]).join('\n');$('shipEft').value='';
 }
 function shipMessage(message){$('shipLibraryStatus').textContent=message;}
@@ -78,6 +78,7 @@ function validShip(p){
  const keys=['general','mining','mineral','fleet','mass','inertia','warp','maxSpeed'];
  if(!/^[a-zA-Z0-9_-]{1,80}$/.test(p.id)||!p.name||p.name.length>64||!p.hull||p.hull.length>64)return false;
  if(p.modules.length>30||p.modules.some(x=>!L.fitEffects[x]))return false;
+ if(p.exactCapacityKind&&!['general','mining','mineral'].includes(p.exactCapacityKind))return false;
  if(keys.some(k=>!Number.isFinite(+(p.base[k]||0))||+(p.base[k]||0)<0||+(p.base[k]||0)>1e11))return false;
  return ['cargoSkillPct','specialHoldSkillPct','exactCapacity','exactAlign','exactWarp'].every(k=>Number.isFinite(+p[k])&&+p[k]>=((k.includes('Skill'))?-90:0)&&+p[k]<=1e9);
 }
@@ -99,7 +100,7 @@ function shipInit(){
  $('shipNew').addEventListener('click',()=>{
   $('shipLibrarySelect').value='';$('shipName').value='';$('shipHull').value='';
   for(const id of Object.values(SHIP_BASE_FIELDS))$(id).value=0;
-  for(const id of ['shipCargoSkill','shipHoldSkill','shipExactCapacity','shipExactAlign','shipExactWarp','shipModules','shipEft'])$(id).value='';
+  for(const id of ['shipCargoSkill','shipHoldSkill','shipExactCapacity','shipExactAlign','shipExactWarp','shipModules','shipEft'])$(id).value='';$('shipExactKind').value='general';
   shipMessage('New fit: fill fields or import EFT, then save.');
  });
  $('shipSave').addEventListener('click',()=>{
@@ -109,7 +110,7 @@ function shipInit(){
   const p={id:current?.id||'fit-'+Date.now().toString(36),name:$('shipName').value.trim(),hull:$('shipHull').value.trim(),
    base:Object.fromEntries(Object.entries(SHIP_BASE_FIELDS).map(([key,id])=>[key,+$(id).value||0])),
    cargoSkillPct:+$('shipCargoSkill').value||0,specialHoldSkillPct:+$('shipHoldSkill').value||0,
-   exactCapacity:+$('shipExactCapacity').value||0,exactAlign:+$('shipExactAlign').value||0,
+   exactCapacity:+$('shipExactCapacity').value||0,exactCapacityKind:$('shipExactKind').value,exactAlign:+$('shipExactAlign').value||0,
    exactWarp:+$('shipExactWarp').value||0,modules};
   if(!validShip(p)){shipMessage('Invalid data or unsupported modifier. Use recognized EVE module/rig names.');return;}
   if(!current&&shipLibrary.length>=32){shipMessage('Ship library is limited to 32 saved fits.');return;}
@@ -118,7 +119,7 @@ function shipInit(){
   shipMenus();$('shipLibrarySelect').value=p.id;showShipEditor();settingsManager.schedule();
   shipMessage('Saved '+p.name+'. Manual fitted overrides include pilot skills and unsupported bonuses.');
   if(!p.base.warp)fetchHull(shipLibrary.find(x=>x.id===p.id),true).catch(e=>shipMessage('Saved; ESI lookup unavailable · '+e.message));
-  if(state.results.length){repriceFreight();drawRows();miningRefresh();}
+  if(state.results.length){repriceFreight();drawRows();const focused=state.results.find(x=>x.name===state.selected);if(focused)selectItem(focused.name);else miningRefresh();}
  });
  $('shipDelete').addEventListener('click',()=>{
   const id=$('shipLibrarySelect').value,p=shipLibrary.find(s=>s.id===id);if(!p)return;
@@ -929,7 +930,7 @@ function candidateTradeRuns(types,regions,books,options){
   }
   const candidate=[];
   for(const source of sells)for(const dest of buys){
-   const kind=TRADE_PRESETS.minerals.includes(item.name)?'mineral':'general';
+   const kind=TRADE_PRESETS.minerals.includes(item.name)?'mineral':RESOURCES.ore.concat(RESOURCES.ice).some(x=>item.name===x||item.name==='Compressed '+x)?'ore':'general';
    const haul=freightInputs(kind,'trade');
    const quote=L.tradeQuote(source,dest,{...options,...haul,unitVolume:item.volume});
    if(quote)candidate.push({item,source,dest,quote,haul});
@@ -1060,7 +1061,7 @@ const settingsManager=(()=>{
   if(mine.session && ['ore','ice'].includes(mine.session.kind) && Number.isFinite(+mine.session.startedAt) && mine.session.startedAt>0 && mine.session.startedAt<=Date.now())miningSession={kind:mine.session.kind,startedAt:+mine.session.startedAt};
   else miningSession=null;
   const savedShips=data.ships||{};
-  if(Array.isArray(savedShips.library)&&savedShips.library.length<=32&&savedShips.library.every(p=>p&&Array.isArray(p.modules)&&validShip(p)))shipLibrary=savedShips.library.map(p=>({...p,base:{...p.base},modules:[...p.modules]}));
+  if(Array.isArray(savedShips.library)&&savedShips.library.length>0&&savedShips.library.length<=32&&savedShips.library.every(p=>p&&Array.isArray(p.modules)&&validShip(p)))shipLibrary=savedShips.library.map(p=>({...p,base:{...p.base},modules:[...p.modules]}));
   for(const role of Object.keys(selectedShips))if(typeof savedShips.selections?.[role]==='string')selectedShips[role]=savedShips.selections[role];
   shipMenus();
   const savedTrade=data.trade||{};
