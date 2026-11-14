@@ -249,6 +249,7 @@ function shipInit(){
    cargoSkillPct:+$('shipCargoSkill').value||0,specialHoldSkillPct:+$('shipHoldSkill').value||0,
    exactCapacity:+$('shipExactCapacity').value||0,exactCapacityKind:$('shipExactKind').value,exactAlign:+$('shipExactAlign').value||0,
    exactWarp:+$('shipExactWarp').value||0,modules};
+  if(current&&current.hull!==p.hull){shipMessage('Existing profiles retain their hull. Use NEW SHIP or the catalog to create a different hull.');return;}
   if(!validShip(p)){shipMessage('Invalid data or unsupported modifier. Use recognized EVE module/rig names.');return;}
   if(!current&&shipLibrary.length>=128){shipMessage('Ship library is limited to 128 saved fits.');return;}
   if(current){if(current.hull===p.hull&&current.typeId)p.typeId=current.typeId;Object.assign(current,p);}
@@ -268,6 +269,9 @@ function shipInit(){
  $('shipImport').addEventListener('click',()=>{
   try{const fit=L.parseEftFit($('shipEft').value);
    $('shipLibrarySelect').value=''; // imported fittings create a new profile, never overwrite the factory hull
+   for(const id of Object.values(SHIP_BASE_FIELDS))$(id).value=0;
+   for(const id of ['shipCargoSkill','shipHoldSkill','shipExactCapacity','shipExactAlign','shipExactWarp'])$(id).value='';
+   $('shipExactKind').value='general';
    $('shipName').value=fit.name;$('shipHull').value=fit.hull;$('shipModules').value=fit.modules.join('\n');
    shipMessage('EFT recognized '+fit.modules.length+' modifiers.'+(fit.unrecognized.length?' Unsupported: '+fit.unrecognized.slice(0,3).join(', '):'')+' Fetch ESI hull, verify fittings/skills, then SAVE.');
   }catch(e){shipMessage('EFT import: '+e.message);}
