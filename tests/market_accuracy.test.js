@@ -24,11 +24,11 @@ assert.equal(A.eligibility(bids[0],{regionId:10000038,systemId:30000055,location
 assert.equal(A.eligibility(bids[0],{regionId:10000002,systemId:30000055,locationId:60000099}),'no');
 assert.equal(A.eligibility({...bids[0],range:'station'},{regionId:10000038,systemId:30000001,locationId:60000099}),'no');
 assert.equal(A.eligibility({...bids[0],range:'station'},{regionId:10000038,systemId:30000001,locationId:60000011}),'yes');
-assert.equal(A.eligibility({...bids[0],range:'solarsystem'},{regionId:10000038,systemId:30000001}),'yes');
-assert.equal(A.eligibility({...bids[0],range:'3'},{regionId:10000038,systemId:30000055}),'unknown');
-assert.equal(A.eligibility({...bids[0],range:'3'},{regionId:10000038,systemId:30000055,gateDistanceByIssuer:{30000001:3}}),'yes');
-assert.equal(A.eligibility({...bids[0],range:'3'},{regionId:10000038,systemId:30000055,gateDistanceByIssuer:{30000001:4}}),'no');
-assert.equal(A.eligibility({...bids[0],range:'40'},{regionId:10000038,systemId:30000055,gateDistanceByIssuer:{30000001:33}}),'yes');
+assert.equal(A.eligibility({...bids[0],range:'solarsystem'},{regionId:10000038,systemId:30000001,locationId:60000011}),'yes');
+assert.equal(A.eligibility({...bids[0],range:'3'},{regionId:10000038,systemId:30000055,locationId:60000099}),'unknown');
+assert.equal(A.eligibility({...bids[0],range:'3'},{regionId:10000038,systemId:30000055,locationId:60000099,gateDistanceByIssuer:{30000001:3}}),'yes');
+assert.equal(A.eligibility({...bids[0],range:'3'},{regionId:10000038,systemId:30000055,locationId:60000099,gateDistanceByIssuer:{30000001:4}}),'no');
+assert.equal(A.eligibility({...bids[0],range:'40'},{regionId:10000038,systemId:30000055,locationId:60000099,gateDistanceByIssuer:{30000001:33}}),'yes');
 assert.equal(A.price(2084000.03),'2,084,000.03');
 const ask=A.normalizeOrder(order(21,{is_buy_order:false,price:1000.18,volume_remain:2,min_volume:1}),24305);
 const qty=A.bestStationFill([ask,...bids],3,'ask');
