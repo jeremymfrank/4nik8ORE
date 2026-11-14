@@ -97,9 +97,19 @@ async function resolveNames(ids){
  for(let i=0;i<ids.length;i+=400)await chunk(ids.slice(i,i+400));
  return found;
 }
+function exportCatalog(){
+ if(!catalog.length)return;
+ const q=s=>'"'+String(s??'').replace(/"/g,'""')+'"';
+ const rows=[['type_id','item_name','market_group','market_path'],...catalog.map(x=>[x.id,x.name,x.group,x.path])];
+ const csv='\uFEFF'+rows.map(row=>row.map(q).join(',')).join('\r\n')+'\r\n';
+ const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),address=URL.createObjectURL(blob);
+ const a=document.createElement('a');a.href=address;a.download='4nik8-eve-market-items-'+new Date().toISOString().slice(0,10)+'.csv';
+ document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(address),1200);
+}
 function populateSearch(){
  const select=$('marketCatalogSuggest');
  if(!select)return;
+ $('marketCatalogExport').disabled=!catalog.length;
  const query=$('marketItemSearch').value.trim().toLowerCase();
  select.innerHTML='';
  if(query.length<2)return;
@@ -314,6 +324,7 @@ function init(){
  if(catalog.length)notice('marketCatalogSummary',catalog.length.toLocaleString()+
   ' market-listed EVE items cached · '+(Date.now()-catalogFetched>=7*DAY?'refresh recommended':'catalog ready'));
  $('marketCatalogSync').addEventListener('click',()=>loadCatalog(true).catch(()=>{}));
+ $('marketCatalogExport').addEventListener('click',exportCatalog);
  $('marketItemSearch').addEventListener('input',populateSearch);
  $('marketExplorerForm').addEventListener('submit',e=>{e.preventDefault();explore();});
 }
