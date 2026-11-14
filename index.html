@@ -41,7 +41,7 @@
       <section class="profit panel">
         <div class="section-name"><span class="ordinal">02</span> OPPORTUNITY BOARD <span class="line"></span><span class="small-label">ORDER BOOK / ISK·M³</span></div>
         <div class="section-ship-row"><label class="field"><span>ORE / ICE PROFIT HAULER</span><select id="oreShipSelect" aria-label="Ore and ice opportunity hauling ship"></select></label><span class="ship-readout" id="oreShipReadout"></span></div>
-        <div class="headline"><div><div class="muted smallcaps">BEST QUOTED OPPORTUNITY</div><div class="headline-name" id="bestName">Awaiting live data</div></div><div class="headline-value"><span id="bestPrice">—</span><small id="headlineUnit">ISK / mined m³ · GROSS</small></div></div>
+        <p class="opportunity-guide">WHAT TO MINE · Choose a resource below to see its buyers, hauling cost and estimated sale proceeds in Freight.</p><div class="sr-only" aria-hidden="true"><span id="bestName"></span><span id="bestPrice"></span><span id="headlineUnit"></span></div>
         <div class="notice" id="notice" role="status">Live orders show where buyers exist, NOT whether a mining deposit exists in your system. Freight and mining rates are estimates based on your settings; PvP exposure, docking access and processing fees remain unverified.</div>
         <div class="sort-strip"><span>RESOURCE / FORM</span><span>BEST REGIONAL BUY ORDERS</span></div>
         <div id="opportunities" class="opportunity-list"><div class="placeholder"><span class="reticle">◎</span><strong>READY FOR DEPARTURE</strong><p>Choose an operating system and scan all major public trading regions in one pass.</p></div></div>
@@ -50,7 +50,7 @@
       <section class="detail panel">
         <div class="section-name"><span class="ordinal">03</span> FREIGHT PROFIT ANALYZER <span class="line"></span><span class="small-label">LIVE BUYERS / EST. NET RETURN</span></div>
         <div class="section-ship-row"><label class="field"><span>FREIGHT SHIP</span><select id="freightShipSelect" aria-label="Freight Profit Analyzer ship"></select></label><span class="ship-readout" id="freightShipReadout"></span></div>
-        <div class="freight-settings" aria-label="Hauling profitability assumptions">
+        <details class="freight-advanced"><summary>HAULING SETTINGS <span>OPTIONAL · TAXES, ROUTE &amp; COST ASSUMPTIONS</span></summary><div class="freight-settings" aria-label="Hauling profitability assumptions">
           <label class="field"><span>MANUAL HAUL CAPACITY · m³</span><input id="haulCapacity" type="number" min="1" max="10000000" value="31625"></label>
           <label class="field"><span>SALES TAX · % (EST.)</span><input id="haulTax" type="number" min="0" max="100" step="0.1" value="7.5"></label>
           <label class="field"><span>CASH EXPENSE · ISK/JUMP (OPTIONAL)</span><input id="haulCostJump" type="number" min="0" max="100000000" step="1000" value="0" title="Normally 0 ISK/jump when hauling your own cargo through stargates. Ship fuel or courier costs can be entered when relevant."></label>
@@ -58,7 +58,7 @@
           <label class="field"><span>AVERAGE WARP DISTANCE · AU / GATE</span><input id="haulAverageAU" type="number" min="0.1" max="250" step="1" value="20" title="Estimate until actual gate-to-gate coordinates are available."></label>
           <label class="field"><span>PILOT TIME · ISK/HR</span><input id="haulTimeValue" type="number" min="0" max="1000000000" step="100000" value="0"></label>
           <label class="field"><span>STARGATE ROUTE</span><select id="haulRoutePref"><option value="Safer">SAFER</option><option value="Shorter">SHORTER</option><option value="LessSecure">LESS SECURE</option></select></label>
-        </div>
+        </div></details>
         <div id="haulDetails" class="detail-body"><p class="muted">A single market scan will automatically compare buyer stations, freight costs and stargate routes. Risk and site availability remain unverified.</p></div>
       </section>
       <section class="mining panel" id="miningPanel">
@@ -145,7 +145,7 @@
         <div class="market-explorer-table-scroll" id="marketExplorerTable"></div>
         <div id="marketExplorerLocal" class="market-explorer-local" role="status">Local-versus-global comparison will appear once the operating system and regional orders are resolved.</div>
         <div id="marketQuantitySummary" class="market-quantity-summary">Quantity-adjusted single-station quotations and buyer-range checks appear after a scan.</div>
-        <div class="market-order-audit">
+        <details class="market-order-audit"><summary>VIEW EVERY INDIVIDUAL ORDER <span>ADVANCED · ORIGINAL PRICES / QUANTITIES / RANGES / CSV</span></summary><div class="market-audit-body">
           <div class="market-audit-title">ORDER-LEVEL AUDIT · ESI PRICES, REMAINING QUANTITIES &amp; RANGES</div>
           <p class="trade-note">Review every retrieved order, not just each region's highest bid. ESI fields retain their original values; purchase and delivery eligibility remain separate from reported prices. Only public regional orders are available without character-authorized private-structure access.</p>
           <div class="market-audit-filters">
@@ -156,53 +156,76 @@
           <div id="marketAuditSummary" class="market-explorer-status">Run a price scan to audit each reported ESI order.</div>
           <div id="marketAuditTable" class="market-explorer-table-scroll"></div>
           <div class="market-audit-pagination"><button type="button" id="marketAuditPrev" disabled>PREVIOUS 50</button><span id="marketAuditPage">0 / 0</span><button type="button" id="marketAuditNext" disabled>NEXT 50</button></div>
-        </div>
+        </div></details>
         <p class="trade-note">* Reported public order prices and ranges are not a guarantee that the pilot can fulfill them. Raw regional spread is an indicative unit-price difference, not guaranteed arbitrage profit: orders may be in different stations, have limited quantities/minimums, and incur fees, freight and PvP risk. ESI public region orders exclude private market access. Failed or unavailable regions are counted explicitly; a partial scan cannot establish a global best price.</p>
       </section>
+
       <section class="ship-library panel" id="shipLibraryPanel">
-        <div class="section-name"><span class="ordinal">07</span> SHIP FITTING LIBRARY <span class="line"></span><span class="small-label">ONE LIBRARY / INDEPENDENT SECTION SHIPS</span></div>
-        <p class="ship-note">Select a saved fit in each section above. Public ESI loads base hull attributes; recognized EFT modules and rigs adjust ordinary cargo, align and warp performance. Enter your actual fitted values to account for skills, implants, hull bonuses, or unsupported modules.</p>
-        <div class="ship-catalog" aria-label="Search official EVE ship hull catalog">
-          <div class="ship-catalog-heading">EVE SHIP CATALOG · LIVE CCP ESI</div>
+        <div class="section-name"><span class="ordinal">07</span> SHIP GARAGE <span class="line"></span><span class="small-label">CHOOSE A SHIP · ESI DOES THE WORK</span></div>
+        <p class="ship-note">Pick a hull and add it. Industrial Command loads its public EVE attributes automatically and keeps the profile on this PC. A personal fitted ship can be customized later, but no fitting work is required to begin.</p>
+        <div class="ship-catalog" aria-label="Find a ship from the complete CCP ship catalog">
+          <div class="ship-catalog-heading">1 · FIND YOUR SHIP</div>
           <div class="ship-catalog-search">
-            <label class="field"><span>FIND A SHIP HULL</span><input id="shipCatalogSearch" type="search" maxlength="80" autocomplete="off" placeholder="Search ships by hull or class, e.g. Porpoise, Orca, Jump Freighter"></label>
-            <label class="field"><span>MATCHING HULLS</span><select id="shipCatalogResults" aria-label="Ship hull catalog results" disabled><option value="">Load EVE's catalog to search</option></select></label>
+            <label class="field"><span>SEARCH BY SHIP NAME OR CLASS</span><input id="shipCatalogSearch" type="search" maxlength="80" autocomplete="off" placeholder="Try Retriever, Tayra, Orca, Providence…"></label>
+            <label class="field"><span>CHOOSE MATCHING SHIP</span><select id="shipCatalogResults" aria-label="EVE ship hulls" disabled><option value="">Loading ships automatically…</option></select></label>
           </div>
           <div class="ship-catalog-actions">
-            <button type="button" id="shipCatalogLoad">REFRESH FROM EVE ESI</button>
-            <button type="button" id="shipCatalogAdd" disabled>ADD SELECTED HULL</button>
-            <button type="button" id="shipCatalogExport" disabled>EXPORT FULL LIST · CSV</button>
+            <button type="button" id="shipCatalogAdd" class="ship-save" disabled>+ ADD THIS SHIP</button>
           </div>
-          <p id="shipCatalogStatus" class="ship-catalog-status" role="status">The full public ship-category catalog loads automatically from CCP ESI. It is cached locally; Refresh checks for new ship hulls. CSV export includes every retrieved hull, not just search matches.</p>
+          <p id="shipCatalogStatus" class="ship-catalog-status" role="status" aria-live="polite">Checking locally saved EVE ship catalog…</p>
         </div>
-        <div class="ship-editor-grid">
-          <label class="field ship-wide"><span>EDIT SAVED SHIP PROFILE</span><select id="shipLibrarySelect" aria-label="Ship profile to edit"></select></label>
-          <label class="field"><span>PROFILE NAME</span><input id="shipName" type="text" maxlength="64" placeholder="e.g. Retriever - Ore Fit (optional)"></label>
-          <label class="field"><span>HULL (EVE NAME)</span><input id="shipHull" type="text" maxlength="64" placeholder="e.g. Tayra"></label>
-          <label class="field"><span>BASE GENERAL CARGO · m³</span><input id="shipGeneral" type="number" min="0" max="100000000" step="any"></label>
-          <label class="field"><span>BASE MINING HOLD · m³</span><input id="shipMining" type="number" min="0" max="100000000" step="any"></label>
-          <label class="field"><span>BASE MINERAL HOLD · m³</span><input id="shipMineral" type="number" min="0" max="100000000" step="any"></label>
-          <label class="field"><span>BASE FLEET HANGAR · m³</span><input id="shipFleet" type="number" min="0" max="100000000" step="any"></label>
-          <label class="field"><span>BASE MASS · kg</span><input id="shipMass" type="number" min="0" max="10000000000" step="any"></label>
-          <label class="field"><span>BASE INERTIA MODIFIER</span><input id="shipInertia" type="number" min="0" max="100" step="any"></label>
-          <label class="field"><span>BASE WARP · AU/s</span><input id="shipWarp" type="number" min="0" max="100" step="any"></label>
-          <label class="field"><span>CARGO SKILL BONUS · %</span><input id="shipCargoSkill" type="number" min="-90" max="300" step="any" value="0"></label>
-          <label class="field"><span>SPECIAL HOLD SKILL BONUS · %</span><input id="shipHoldSkill" type="number" min="-90" max="300" step="any" value="0"></label>
-          <label class="field"><span>EXACT FITTED CAPACITY · m³ (OPTIONAL)</span><input id="shipExactCapacity" type="number" min="0" max="100000000" step="any" placeholder="Override selected cargo type"></label>
-          <label class="field"><span>EXACT CAPACITY HOLD TYPE</span><select id="shipExactKind"><option value="general">GENERAL CARGO</option><option value="mining">ORE / ICE HOLD</option><option value="mineral">MINERAL HOLD</option></select></label>
-          <label class="field"><span>EXACT FITTED ALIGN · sec (OPTIONAL)</span><input id="shipExactAlign" type="number" min="0" max="100000" step="any" placeholder="From in-game fitting"></label>
-          <label class="field"><span>EXACT FITTED WARP · AU/s (OPTIONAL)</span><input id="shipExactWarp" type="number" min="0" max="100" step="any" placeholder="From in-game fitting"></label>
-          <label class="field ship-wide"><span>RECOGNIZED MODULES / RIGS (ONE PER LINE)</span><textarea id="shipModules" rows="3" placeholder="Expanded Cargohold II&#10;Medium Hyperspatial Velocity Optimizer I"></textarea></label>
-          <label class="field ship-wide"><span>PASTE AN EVE FIT (EFT FORMAT) · OPTIONAL</span><textarea id="shipEft" rows="3" placeholder="[Tayra, Cargo Runner]&#10;Expanded Cargohold II&#10;..."></textarea></label>
+        <div class="ship-easy-chooser">
+          <label class="field"><span>2 · SAVED SHIP / FIT</span><select id="shipLibrarySelect" aria-label="Choose a saved ship or fitting"></select></label>
+          <div class="ship-easy-hint">Pick this ship separately in the Mining, Opportunity, Freight, or Trading panels above.</div>
         </div>
-        <div class="ship-actions">
-          <button type="button" id="shipNew">NEW SHIP</button>
-          <button type="button" id="shipImport">IMPORT EFT</button>
-          <button type="button" id="shipFetch">FETCH HULL FROM ESI</button>
-          <button type="button" id="shipSave" class="ship-save">SAVE PROFILE</button>
-          <button type="button" id="shipDelete">DELETE</button>
-        </div>
-        <div id="shipLibraryStatus" role="status" class="ship-library-status">Saved fitting profiles are stored with your existing Windows settings backup.</div>
+        <div class="ship-quick-stats" id="shipQuickStats" aria-live="polite">Checking the selected hull's ESI cargo, align and warp attributes…</div>
+        <div id="shipLibraryStatus" role="status" class="ship-library-status">Public hull data loads automatically. Personal fittings stay on this PC.</div>
+        <details class="ship-advanced" id="shipFitAdvanced">
+          <summary>CUSTOMIZE MY FIT <span>OPTIONAL · SKILLS, MODULES &amp; IN-GAME VALUES</span></summary>
+          <p class="ship-advanced-intro">ESI provides base hull data, not your character's exact skill bonuses or fitted module effects. Only change anything here if you want a more accurate personal fit. Ordinary ship selection requires none of this.</p>
+          <div class="ship-editor-grid">
+            <label class="field"><span>OPTIONAL FIT NAME</span><input id="shipName" type="text" maxlength="64" placeholder="Default: hull name"></label>
+            <label class="field"><span>SHIP HULL · FROM EVE</span><input id="shipHull" type="text" maxlength="64" placeholder="Official hull name" readonly></label>
+            <label class="field"><span>FITTED CARGO BONUS · %</span><input id="shipCargoSkill" type="number" min="-90" max="300" step="any" value="0"></label>
+            <label class="field"><span>FITTED SPECIAL HOLD BONUS · %</span><input id="shipHoldSkill" type="number" min="-90" max="300" step="any" value="0"></label>
+            <label class="field"><span>EXACT FITTED CAPACITY · m³ (IF KNOWN)</span><input id="shipExactCapacity" type="number" min="0" max="100000000" step="any" placeholder="Leave empty for ESI / calculated"></label>
+            <label class="field"><span>CAPACITY TYPE FOR THE FIELD ABOVE</span><select id="shipExactKind"><option value="general">GENERAL CARGO</option><option value="mining">ORE / ICE HOLD</option><option value="mineral">MINERAL HOLD</option></select></label>
+            <label class="field"><span>ACTUAL ALIGN TIME · SEC (IF KNOWN)</span><input id="shipExactAlign" type="number" min="0" max="100000" step="any" placeholder="Leave empty for calculated"></label>
+            <label class="field"><span>ACTUAL WARP SPEED · AU/s (IF KNOWN)</span><input id="shipExactWarp" type="number" min="0" max="100" step="any" placeholder="Leave empty for ESI"></label>
+            <label class="field ship-wide"><span>OPTIONAL FITTING MODULES / RIGS · ONE PER LINE</span><textarea id="shipModules" rows="3" placeholder="Expanded Cargohold II&#10;Medium Hyperspatial Velocity Optimizer I"></textarea></label>
+            <label class="field ship-wide"><span>OR PASTE AN EVE FIT (EFT FORMAT)</span><textarea id="shipEft" rows="3" placeholder="[Tayra, Cargo Fit]&#10;Expanded Cargohold II"></textarea></label>
+          </div>
+          <div class="ship-actions">
+            <button type="button" id="shipImport">USE PASTED FIT</button>
+            <button type="button" id="shipSave" class="ship-save">SAVE MY FIT</button>
+            <button type="button" id="shipDelete">REMOVE PROFILE</button>
+          </div>
+          <details class="ship-technical">
+            <summary>TECHNICAL HULL DATA &amp; REPAIR TOOLS <span>RARELY NEEDED</span></summary>
+            <p class="ship-advanced-intro">These are the public base hull attributes, not your personal fitted ship's attributes. They are automatically downloaded and normally should not be edited.</p>
+            <div class="ship-editor-grid">
+              <label class="field"><span>BASE CARGO · m³</span><input id="shipGeneral" type="number" min="0" max="100000000" step="any" readonly></label>
+              <label class="field"><span>BASE MINING HOLD · m³</span><input id="shipMining" type="number" min="0" max="100000000" step="any" readonly></label>
+              <label class="field"><span>BASE MINERAL HOLD · m³</span><input id="shipMineral" type="number" min="0" max="100000000" step="any" readonly></label>
+              <label class="field"><span>BASE FLEET HANGAR · m³</span><input id="shipFleet" type="number" min="0" max="100000000" step="any" readonly></label>
+              <label class="field"><span>BASE MASS · kg</span><input id="shipMass" type="number" min="0" max="10000000000" step="any" readonly></label>
+              <label class="field"><span>BASE INERTIA MODIFIER</span><input id="shipInertia" type="number" min="0" max="100" step="any" readonly></label>
+              <label class="field"><span>BASE WARP · AU/s</span><input id="shipWarp" type="number" min="0" max="100" step="any" readonly></label>
+            </div>
+            <div class="ship-actions">
+              <button type="button" id="shipFetch">RETRY HULL DATA FROM ESI</button>
+              <button type="button" id="shipManualBase">ENABLE MANUAL BASE EDITING</button>
+              <button type="button" id="shipNew">MANUAL CUSTOM HULL</button>
+            </div>
+          </details>
+        </details>
+        <details class="ship-maintenance-tools">
+          <summary>SHIP CATALOG MAINTENANCE <span>ADVANCED · STORED AUTOMATICALLY</span></summary>
+          <div class="ship-catalog-actions">
+            <button type="button" id="shipCatalogLoad">RELOAD CCP SHIP LIST</button>
+            <button type="button" id="shipCatalogExport">EXPORT SHIP LIST · CSV</button>
+          </div>
+        </details>
       </section>
       <section class="radio panel">
         <div class="radio-header"><div class="radio-mark" aria-hidden="true">◉</div><div class="grow"><div class="eyebrow">CH 19 / 4NIK8 ORE ENTERTAINMENT</div><h2>CB ContraBand Radio</h2><div class="radio-tagline">If CONCORD asks, you ain't heard nothin'.</div></div><button class="radio-collapse" id="radioCollapse" aria-expanded="true" title="Collapse radio">▾</button></div>
@@ -229,7 +252,7 @@
           <audio id="audioPlayer" preload="none"></audio>
         </div>
       </section>
-      <footer class="bottom"><span>4NIK8 ORE / INDUSTRIAL RECLAMATION</span><span class="version">PREVIEW v0.6.1 · LOCAL WINDOWS</span></footer>
+      <footer class="bottom"><span>4NIK8 ORE / INDUSTRIAL RECLAMATION</span><span class="version">PREVIEW v0.6.2 · LOCAL WINDOWS</span></footer>
     </main>
   </div>
   <script src="logic.js"></script>
