@@ -59,7 +59,7 @@
         <div class="section-ship-row"><label class="field"><span>MINING SHIP</span><select id="miningShipSelect" aria-label="Mining Performance ship"></select></label><span class="ship-readout" id="miningShipReadout"></span></div>
         <div class="mining-intro">One ship profile feeds every resource in the market scan. Enter your fitted mining-cycle values once, or time a real session to calibrate an observed rate. No guessed Retriever performance.</div>
         <div class="mining-profile-grid">
-          <label class="field mining-profile-name"><span>MINING CALIBRATION NAME</span><input type="text" id="miningProfileName" maxlength="56" value="High on Supply / Retriever" aria-label="Mining ship profile name"></label>
+          <label class="field mining-profile-name"><span>MINING CALIBRATION NAME</span><input type="text" id="miningProfileName" maxlength="56" value="Retriever" aria-label="Mining ship profile name"></label>
           <label class="field"><span>UPTIME · % (THEORETICAL)</span><input type="number" id="miningUptime" min="1" max="100" step="1" value="100" title="Percentage of theoretical laser time spent mining. Not applied to measured session rates."></label>
         </div>
         <div class="mining-config">
@@ -115,9 +115,21 @@
       <section class="ship-library panel" id="shipLibraryPanel">
         <div class="section-name"><span class="ordinal">06</span> SHIP FITTING LIBRARY <span class="line"></span><span class="small-label">ONE LIBRARY / INDEPENDENT SECTION SHIPS</span></div>
         <p class="ship-note">Select a saved fit in each section above. Public ESI loads base hull attributes; recognized EFT modules and rigs adjust ordinary cargo, align and warp performance. Enter your actual fitted values to account for skills, implants, hull bonuses, or unsupported modules.</p>
+        <div class="ship-catalog" aria-label="Search official EVE ship hull catalog">
+          <div class="ship-catalog-heading">ALL EVE SHIP HULLS · CCP ESI CATALOG</div>
+          <div class="ship-catalog-search">
+            <label class="field"><span>FIND A SHIP HULL</span><input id="shipCatalogSearch" type="search" maxlength="80" autocomplete="off" placeholder="Search ships by hull or class, e.g. Porpoise, Orca, Jump Freighter"></label>
+            <label class="field"><span>MATCHING HULLS</span><select id="shipCatalogResults" aria-label="Ship hull catalog results" disabled><option value="">Load EVE's catalog to search</option></select></label>
+          </div>
+          <div class="ship-catalog-actions">
+            <button type="button" id="shipCatalogLoad">LOAD / REFRESH SHIP CATALOG</button>
+            <button type="button" id="shipCatalogAdd" disabled>ADD SELECTED HULL</button>
+          </div>
+          <p id="shipCatalogStatus" class="ship-catalog-status" role="status">The catalog is loaded on request from public EVE ship-category data and cached locally. All sections can select any catalog hull after loading.</p>
+        </div>
         <div class="ship-editor-grid">
           <label class="field ship-wide"><span>EDIT SAVED SHIP PROFILE</span><select id="shipLibrarySelect" aria-label="Ship profile to edit"></select></label>
-          <label class="field"><span>PROFILE NAME</span><input id="shipName" type="text" maxlength="64" placeholder="e.g. High on Supply"></label>
+          <label class="field"><span>PROFILE NAME</span><input id="shipName" type="text" maxlength="64" placeholder="e.g. Retriever - Ore Fit (optional)"></label>
           <label class="field"><span>HULL (EVE NAME)</span><input id="shipHull" type="text" maxlength="64" placeholder="e.g. Tayra"></label>
           <label class="field"><span>BASE GENERAL CARGO · m³</span><input id="shipGeneral" type="number" min="0" max="100000000" step="any"></label>
           <label class="field"><span>BASE MINING HOLD · m³</span><input id="shipMining" type="number" min="0" max="100000000" step="any"></label>
@@ -169,7 +181,7 @@
           <audio id="audioPlayer" preload="none"></audio>
         </div>
       </section>
-      <footer class="bottom"><span>4NIK8 ORE / INDUSTRIAL RECLAMATION</span><span class="version">PREVIEW v0.5.0 · LOCAL WINDOWS</span></footer>
+      <footer class="bottom"><span>4NIK8 ORE / INDUSTRIAL RECLAMATION</span><span class="version">PREVIEW v0.5.1 · LOCAL WINDOWS</span></footer>
     </main>
   </div>
   <script src="logic.js"></script>
