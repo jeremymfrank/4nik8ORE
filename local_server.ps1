@@ -256,6 +256,38 @@ try {
                      }
                      $kind=[string]$p.exactCapacityKind
                      $clean['exactCapacityKind'] = if (@('general','mining','mineral') -contains $kind) {$kind} else {'general'}
+                     if ($null -ne $p.miningCalibration) {
+                        $rawCal=$p.miningCalibration
+                        $pnameCal=[string]$rawCal.profileName
+                        if ($pnameCal.Length -gt 56) { throw 'Mining calibration profile name too long' }
+                        $cal=[ordered]@{profileName=$pnameCal}
+                        foreach ($field in @('oreYield','oreCycle','oreModules','iceUnits','iceCycle','iceModules',
+                            'uptimePct','observedOreM3Hour','observedIceM3Hour')) {
+                           $v=$rawCal.$field
+                           if ($null -eq $v -or [string]$v -eq '') { $cal[$field]=$null; continue }
+                           $n=0.0
+                           if (-not [double]::TryParse([string]$v,[System.Globalization.NumberStyles]::Float,
+                               [System.Globalization.CultureInfo]::InvariantCulture,[ref]$n)) { throw 'Invalid mining ship calibration' }
+                           $limit = switch ($field) {
+                              'oreYield' {1000000} 'oreCycle' {10000} 'oreModules' {16} 'iceUnits' {1000}
+                              'iceCycle' {10000} 'iceModules' {16} 'uptimePct' {100}
+                              default {1000000000}
+                           }
+                           $min = switch ($field) {
+                              'oreCycle' {0.1} 'iceCycle' {0.1} 'oreModules' {1} 'iceModules' {1}
+                              'uptimePct' {1} 'observedOreM3Hour' {0.01} 'observedIceM3Hour' {0.01}
+                              default {0}
+                           }
+                           if ([double]::IsNaN($n) -or [double]::IsInfinity($n) -or $n -lt $min -or $n -gt $limit) {
+                              throw 'Mining calibration out of range'
+                           }
+                           if ($field -in @('oreModules','iceModules') -and $n -ne [Math]::Floor($n)) {
+                              throw 'Mining module count must be an integer'
+                           }
+                           $cal[$field]=$n
+                        }
+                        $clean['miningCalibration']=$cal
+                     }
                      $tid=0
                      [int]::TryParse([string]$p.typeId,[ref]$tid) | Out-Null
                      if ($tid -gt 0) { $clean['typeId']=$tid }
