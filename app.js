@@ -44,7 +44,7 @@ function validCatalogEntry(x){
 function loadCachedShipCatalog(){
  try{
   const cache=JSON.parse(localStorage.getItem(SHIP_CATALOG_KEY)||'null');
-  if(cache?.version!==1||!(Date.now()-cache.at<SHIP_CATALOG_AGE)||
+  if(cache?.version!==1||!(Date.now()-cache.at>=0&&Date.now()-cache.at<SHIP_CATALOG_AGE)||
    !Array.isArray(cache.ships)||cache.ships.length<10||cache.ships.length>10000||
    !cache.ships.every(validCatalogEntry))return;
   shipCatalog=cache.ships;catalogComplete=true;
@@ -69,7 +69,7 @@ function refreshCatalogMatches(){
 async function fetchShipCatalog(){
  if(catalogLoading)return;
  catalogLoading=true;$('shipCatalogLoad').disabled=true;$('shipCatalogAdd').disabled=true;
- let failures=0;
+ let failures=0,finalMessage='';
  try{
   catalogStatus('Loading EVE ship group list…');
   const category=await request('/universe/categories/6/',{},86400000,true);
@@ -109,11 +109,11 @@ async function fetchShipCatalog(){
    shipCatalog=catalog;catalogComplete=false;
   }
   shipMenus();refreshCatalogMatches();
-  if(failures)catalogStatus('Ship catalog refresh incomplete: '+failures+' ESI request(s) failed. '+shipCatalog.length+
-   ' hulls available; retry to refresh. Existing complete cache retained when available.');
- }catch(error){catalogStatus('Ship catalog unavailable · '+error.message+
-  '. You can still enter an exact EVE hull name and fetch it directly.');}
- finally{catalogLoading=false;$('shipCatalogLoad').disabled=false;refreshCatalogMatches();}
+  if(failures)finalMessage='Ship catalog refresh incomplete: '+failures+' ESI request(s) failed. '+shipCatalog.length+
+   ' hulls available; retry to refresh. Existing complete cache retained when available.';
+ }catch(error){finalMessage='Ship catalog unavailable · '+error.message+
+  '. You can still enter an exact EVE hull name and fetch it directly.';}
+ finally{catalogLoading=false;$('shipCatalogLoad').disabled=false;refreshCatalogMatches();if(finalMessage)catalogStatus(finalMessage);}
 }
 async function addShipFromCatalog(id){
  const entry=shipCatalog.find(s=>s.id===+id);
