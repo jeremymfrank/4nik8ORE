@@ -98,7 +98,7 @@ const M=window.ICMarketExplorer,R=window.ICResourceBrowser;
  await M.explore();
  assert(el('marketBestBuy').textContent.includes('20'),'buy price is the lowest sell ask');
  assert(el('marketBestSell').textContent.includes('30'),'sell price is highest buy bid');
- assert(el('marketExplorerTable').innerHTML.includes('100'),'market explorer table created');
+ assert(el('marketExplorerTable').innerHTML.includes('The Forge'),'market explorer regional table created');
  assert(el('marketExplorerStatus').textContent.includes('2/2'),'both known-space regions scanned');
  assert(!el('marketExplorerStatus').textContent.includes('3/3'),'wormhole regions excluded from public markets');
  assert(requests.some(x=>x.includes('/markets/groups/')));
