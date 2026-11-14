@@ -21,6 +21,8 @@ function element(id){
 const document={getElementById:element,querySelectorAll(){return [];}};
 const store=new Map(),localStorage={getItem(k){return store.get(k)??null;},setItem(k,v){store.set(k,String(v));}};
 const known={
+ retriever:{name:'Retriever',group_id:20,published:true,mass:12000000,capacity:550,
+  dogma_attributes:[{attribute_id:70,value:0.5},{attribute_id:600,value:3.5},{attribute_id:1556,value:27500}]},
  category:{category_id:6,name:'Ship',groups:[20,21]},
  mining:{category_id:6,group_id:20,name:'Mining Barge',published:true,types:[17480,17481]},
  industrial:{category_id:6,group_id:21,name:'Industrial',published:true,types:[649]},
@@ -44,6 +46,11 @@ async function fetch(url,options={}){
   if(requested.includes(900004))return {ok:false,status:404,statusText:'Not Found'};
   value=known.names.filter(x=>requested.includes(x.id));
  }
+ else if(url.includes('/universe/ids/')){
+  const requested=JSON.parse(options.body||'[]');
+  value={inventory_types:known.names.filter(n=>requested.some(s=>s.toLowerCase()===n.name.toLowerCase()))};
+ }
+ else if(url.includes('/universe/types/17480'))value=known.retriever;
  else if(url.includes('/universe/types/17481'))value=known.procurer;
  else throw Error('Unexpected mocked ESI call '+url);
  return {ok:true,json:async()=>value};
@@ -57,7 +64,14 @@ new Function('window','document','fetch','localStorage','setTimeout','clearTimeo
  assert.equal(win.__test.getCatalog().length,0);
  await win.__test.shipCatalogInit(); // ESI fetch starts automatically on first use.
  win.__test.shipInit(); // On a cached startup, no additional category fetch occurs.
- assert.equal(win.__test.getLibrary().find(p=>p.id==='retriever').name,'Retriever');
+ // The new simple garage must fetch base stats automatically, with no user button.
+ await new Promise(resolve=>setImmediate(resolve));
+ const retriever=win.__test.getLibrary().find(p=>p.id==='retriever');
+ assert.equal(retriever.name,'Retriever');
+ assert.equal(retriever.base.mining,27500);
+ assert.equal(element('shipGeneral').value,550);
+ assert(element('shipQuickStats').innerHTML.includes('27,500'));
+ assert.equal(element('shipGeneral').readOnly,true);
  assert.deepEqual(win.__test.getCatalog().map(s=>s.name).slice(0,3),['Badger','Procurer','Retriever']);
  assert.equal(win.__test.getCatalog().length,13); // All type IDs survive a missing ESI name.
  assert(win.__test.getCatalog().some(s=>s.id===900004&&s.name==='UNRESOLVED TYPE #900004'));
@@ -83,5 +97,12 @@ new Function('window','document','fetch','localStorage','setTimeout','clearTimeo
  assert.equal(win.__test.getSelections().trade,'manual');
  assert.equal(win.__test.getSelections().freight,'manual');
  assert(calls.some(url=>url.includes('/universe/categories/6')));
- console.log('PASS auto ESI ship catalog, complete CSV export, neutral defaults, hull attributes, independent selectors and cached catalog');
+ // Copy-paste an EFT fit in Advanced; a single click imports, loads ESI and saves.
+ element('shipEft').value='[Retriever, Test Ore Rig]\\nExpanded Cargohold II';
+ await element('shipImport').listeners.click();
+ assert(win.__test.getLibrary().some(x=>x.name==='Test Ore Rig'));
+ assert.equal(win.__test.getLibrary().find(x=>x.name==='Test Ore Rig').base.mining,27500);
+ assert(element('shipLibraryStatus').textContent.includes('Imported & saved'));
+
+ console.log('PASS simple ship garage auto-hydration, read-only API stats, single-click fitted ship import, saved ship catalog and selectors');
 })().catch(error=>{console.error(error);process.exitCode=1;});
