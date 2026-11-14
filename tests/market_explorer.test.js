@@ -2,6 +2,7 @@
 // Run offline: node tests/market_explorer.test.js
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 require('../logic.js');
+require('../market_accuracy.js');
 const root=path.join(__dirname,'..');
 const marketCode=fs.readFileSync(path.join(root,'market_explorer.js'),'utf8');
 const resourceCode=fs.readFileSync(path.join(root,'resource_catalog.js'),'utf8');
@@ -21,7 +22,7 @@ const document={
 const storage=new Map(),localStorage={
  getItem(k){return storage.get(k)??null;},setItem(k,v){storage.set(k,String(v));}
 };
-const listeners=new Map(),window={ICLogic:globalThis.ICLogic,
+const listeners=new Map(),window={ICLogic:globalThis.ICLogic,ICMarketAccuracy:globalThis.ICMarketAccuracy,
  addEventListener(name,fn){listeners.set(name,fn);},
  dispatchEvent(e){listeners.get(e.type)?.(e);}
 };
@@ -40,6 +41,8 @@ const marketGroups=[
  {market_group_id:16,name:'Minerals',parent_group_id:10,types:[1006,...Array.from({length:24},(_,i)=>2000+i)]},
  {market_group_id:17,name:'Compressed Ores',parent_group_id:10,types:[1007]}
 ];
+const orders=(id,values)=>({order_id:id,type_id:1006,price:10,volume_remain:10,volume_total:20,
+ min_volume:1,range:'station',location_id:60000001,system_id:30000142,is_buy_order:false,issued:'2026-11-14T00:00:00Z',duration:90,...values});
 const requests=[];
 async function fetch(url,opts={}){
  const address=new URL(url);const pathname=address.pathname,method=opts.method||'GET';
@@ -57,15 +60,15 @@ async function fetch(url,opts={}){
    market_group_id:group?.market_group_id||0,published:true};
  }else if(pathname==='/universe/regions/')data=[10000002,10000043,11000001];
  else if(pathname.startsWith('/markets/10000002/orders/'))data=[
-  {is_buy_order:false,price:20,volume_remain:200,location_id:60000001,system_id:30000142,min_volume:1},
-  {is_buy_order:true,price:18,volume_remain:80,location_id:60000002,system_id:30000142,min_volume:1}
+  orders(1,{price:20,volume_remain:200,volume_total:250}),
+  orders(2,{price:18,volume_remain:80,volume_total:100,is_buy_order:true,range:'region',location_id:60000002})
  ];
  else if(pathname.startsWith('/markets/10000043/orders/'))data=[
-  {is_buy_order:false,price:25,volume_remain:150,location_id:60000101,system_id:30002187,min_volume:1},
-  {is_buy_order:true,price:30,volume_remain:70,location_id:60000102,system_id:30002187,min_volume:10}
+  orders(3,{price:25,volume_remain:150,volume_total:200,location_id:60000101,system_id:30002187}),
+  orders(4,{price:30,volume_remain:70,volume_total:90,location_id:60000102,system_id:30002187,is_buy_order:true,min_volume:10,range:'solarsystem'})
  ];
  else throw Error('Unexpected URL '+url);
- return {ok:true,json:async()=>data};
+ return {ok:true,headers:{get:()=>null},json:async()=>data};
 }
 const run=new Function('window','document','localStorage','fetch','setTimeout','clearTimeout','AbortController','CustomEvent','URL',marketCode);
 run(window,document,localStorage,fetch,setTimeout,clearTimeout,AbortController,class{constructor(type){this.type=type;}},URL);
@@ -94,11 +97,19 @@ const M=window.ICMarketExplorer,R=window.ICResourceBrowser;
  const visible=(await M.regions()).map(x=>x.id);
  assert.deepEqual(visible,[10000002,10000043]);
  el('marketItemSearch').value='Tritanium';
+ el('marketQuantity').value='15';
+ el('marketAccessFilter').value='all';
+ el('marketAuditSide').value='buy';
  el('marketExplorerScope').value='all';
  await M.explore();
  assert(el('marketBestBuy').textContent.includes('20'),'buy price is the lowest sell ask');
  assert(el('marketBestSell').textContent.includes('30'),'sell price is highest buy bid');
  assert(el('marketExplorerTable').innerHTML.includes('The Forge'),'market explorer regional table created');
+ assert(el('marketAuditTable').innerHTML.includes('30.00'),'regional highest bid matches ESI cents');
+ assert(el('marketAuditTable').innerHTML.includes('Solar System'),'raw range preserved');
+ assert(el('marketAuditTable').innerHTML.includes('70'),'remaining quantity preserved');
+ assert(el('marketQuantitySummary').innerHTML.includes('15 units'),'quantity quote generated');
+
  assert(el('marketExplorerStatus').textContent.includes('2/2'),'both known-space regions scanned');
  assert(!el('marketExplorerStatus').textContent.includes('3/3'),'wormhole regions excluded from public markets');
  assert(requests.some(x=>x.includes('/markets/groups/')));
