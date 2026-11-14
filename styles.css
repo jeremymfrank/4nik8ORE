@@ -496,3 +496,62 @@ input[type=search]{background:#101415;color:#f1e5cb;border:1px solid #57605b;bor
 
 /* Keep potentially long local settings validation errors readable instead of clipping them. */
 #settingsStatus{overflow-wrap:anywhere;min-width:0;max-width:100%;white-space:normal;line-height:1.45}
+
+
+/* v0.6.2 · simple ship garage, readable on laptops, ultrawide, 4K and portrait */
+.ship-library{min-width:0}
+.ship-library .ship-note{font-size:12px;line-height:1.65;max-width:80ch;color:var(--muted);margin:4px 0 16px}
+.ship-catalog{padding:16px;background:linear-gradient(120deg,#182527,#222124);margin:0 0 13px}
+.ship-catalog-heading{font-size:12px;color:var(--amber);letter-spacing:.5px;margin-bottom:12px}
+.ship-catalog-search input,.ship-catalog-search select{min-height:44px;font-size:13px}
+.ship-catalog-actions button.ship-save{background:var(--amber);color:#181a1a;font-size:12px;letter-spacing:.5px;font-weight:900}
+.ship-catalog-actions button.ship-save:disabled{opacity:.48}
+.ship-easy-chooser{border:1px solid var(--edge);background:#1c2425;border-radius:6px;padding:13px 15px;margin-bottom:11px;display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:12px;align-items:end}
+.ship-easy-chooser .field>span{font-size:12px;color:#e9c488;letter-spacing:.5px}
+.ship-easy-chooser select{min-height:46px;font-size:13px}
+.ship-easy-hint{font-size:11px;color:var(--muted);line-height:1.6;max-width:35ch}
+.ship-quick-stats{border:1px solid var(--edge2);border-radius:6px;padding:14px;margin-bottom:10px;background:linear-gradient(130deg,#1c2529,#222126);min-height:104px}
+.ship-quick-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.ship-quick-heading strong{font-size:15px;font-weight:900;color:#f5e5c7}
+.ship-quick-heading span{font-size:10px;font-weight:900;letter-spacing:.45px}
+.ship-esistatus-ready{color:var(--green)}
+.ship-esistatus-loading,.ship-info-wait{color:var(--amber)}
+.ship-stat-cards{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.ship-stat-card{display:flex;flex-direction:column;gap:5px;border:1px solid #3f4b4a;background:#101a1daa;padding:11px 10px;border-radius:4px;min-width:0}
+.ship-stat-card small{font-size:10px;color:var(--muted);line-height:1.2}
+.ship-stat-card strong{font-size:clamp(13px,1.4vw,21px);color:var(--green);font-weight:900;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.ship-stat-card span{font-size:10px;color:var(--muted)}
+.ship-info-help{margin:10px 0 0;font-size:10px;color:var(--muted);line-height:1.55}
+.ship-library-status{margin-bottom:13px;border-radius:4px;padding:9px 12px;color:#cbd8cc}
+.ship-advanced,.ship-maintenance-tools,.ship-technical,.market-order-audit,.freight-advanced{border:1px solid var(--edge2);border-radius:6px;background:#171d20;margin:9px 0;min-width:0}
+.ship-advanced>summary,.ship-maintenance-tools>summary,.ship-technical>summary,.market-order-audit>summary,.freight-advanced>summary{list-style:none;cursor:pointer;padding:13px 15px;display:flex;justify-content:space-between;align-items:center;gap:14px;font-size:12px;font-weight:900;color:#e9c589;min-height:46px}
+.ship-advanced>summary::-webkit-details-marker,.ship-maintenance-tools>summary::-webkit-details-marker,.ship-technical>summary::-webkit-details-marker,.market-order-audit>summary::-webkit-details-marker,.freight-advanced>summary::-webkit-details-marker{display:none}
+.ship-advanced>summary::before,.ship-maintenance-tools>summary::before,.ship-technical>summary::before,.market-order-audit>summary::before,.freight-advanced>summary::before{content:"▸";color:var(--amber);margin-right:5px}
+.ship-advanced[open]>summary::before,.ship-maintenance-tools[open]>summary::before,.ship-technical[open]>summary::before,.market-order-audit[open]>summary::before,.freight-advanced[open]>summary::before{content:"▾"}
+.ship-advanced>summary span,.ship-maintenance-tools>summary span,.ship-technical>summary span,.market-order-audit>summary span,.freight-advanced>summary span{font-weight:500;color:var(--muted);font-size:10px;margin-left:auto}
+.ship-advanced[open],.market-order-audit[open],.freight-advanced[open]{background:#1a2023}
+.ship-advanced .ship-editor-grid,.ship-advanced>.ship-actions,.ship-technical .ship-editor-grid,.ship-technical>.ship-actions{margin:12px}
+.ship-advanced-intro{margin:12px 14px;font-size:11px;color:var(--muted);line-height:1.7}
+.ship-technical{margin:12px;border-color:var(--edge)}
+.ship-technical input[readonly],.ship-advanced input[readonly]{opacity:.72;background:#182021;cursor:default}
+.ship-advanced .ship-save{min-width:160px}
+.ship-maintenance-tools>.ship-catalog-actions{padding:0 12px 11px}
+.ship-info-error{color:var(--bad)}
+.market-order-audit{padding:0!important;overflow:hidden}
+.market-order-audit>summary{color:var(--amber);margin:0}
+.market-audit-body{padding:0 13px 13px}
+.market-audit-title{padding-top:5px}
+.freight-advanced{margin:11px 0 13px}
+.freight-advanced .freight-settings{margin:0;border:0;border-top:1px solid var(--edge);border-radius:0;padding:13px}
+.opportunity-guide{background:#202a28;border-left:3px solid var(--amber);padding:11px 13px;margin:0 0 12px;color:#d5d9cd;line-height:1.6;font-size:12px}
+@media(max-width:1050px){
+ .ship-stat-cards{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .ship-easy-chooser{grid-template-columns:1fr}
+}
+@media(max-width:610px){
+ .ship-stat-cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .ship-advanced>summary,.ship-maintenance-tools>summary,.ship-technical>summary,.market-order-audit>summary,.freight-advanced>summary{align-items:flex-start;flex-wrap:wrap}
+ .ship-easy-chooser{padding:10px}
+ .ship-catalog{padding:11px}
+ .ship-quick-stats{padding:10px}
+}
