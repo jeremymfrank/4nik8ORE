@@ -61,7 +61,8 @@ api.freightEstimate=function(quote,jumps,unitM3,minedRawM3,opts){
  const totalJumpLegs=+jumps*Math.max(0,2*trips-1); // return between loads, end at destination
  const salesTax=+quote.gross*(+opts.taxPct/100);
  const haulCashCost=totalJumpLegs*+opts.cashPerJump;
- const travelMinutes=totalJumpLegs*+opts.minutesPerJump;
+ const perRoute=api.shipTravelMinutes(+jumps,opts);
+  const travelMinutes=(2*trips-1)*perRoute;
  const timeCost=travelMinutes/60*+opts.pilotISKHour;
  const net=+quote.gross-salesTax-haulCashCost-timeCost;
  return {jumps:+jumps,trips,totalJumpLegs,salesTax,haulCashCost,travelMinutes,timeCost,net,shippedM3:volume,perMinedM3:net/minedRawM3,full:!!quote.full};
@@ -93,7 +94,7 @@ api.miningPerformance=function(item,variant,profile,haulOptions,kind){
  if(!rate)return null;
  const e=variant.estimate,q=variant.quote,haul=haulOptions;
  const miningHours=item.volume/rate.m3Hour;
- const finalReturnMinutes=profile.returnHome?e.jumps*+haul.minutesPerJump:0;
+ const finalReturnMinutes=profile.returnHome?api.shipTravelMinutes(e.jumps,haul):0;
  const finalReturnCash=profile.returnHome?e.jumps*+haul.cashPerJump:0;
  const handlingMinutes=+profile.handlingMinutes;
  const travelMinutes=e.travelMinutes+finalReturnMinutes;
@@ -160,6 +161,89 @@ api.tradeQuote=function(seller,buyer,opts){
   marginPct:100*profit/cost,roiPct:100*profit/cost,
   sourceId:seller.locationId,destId:buyer.locationId,
   sourceSystem:seller.systemId,destSystem:buyer.systemId};
+};
+
+// Shared fitted ship calculations. Public ESI hull data supplies base attributes;
+// pilot skill bonuses and unrecognized fittings must be calibrated, not invented.
+const SHIP_STACK=[1,.869,.571,.283,.106,.03];
+const FIT_EFFECTS={
+ 'expanded cargohold i':{cargo:.175},'expanded cargohold ii':{cargo:.275},
+ 'cargohold optimization i':{cargo:.15},'cargohold optimization ii':{cargo:.20},
+ 'inertial stabilizers i':{inertia:-.167},'inertial stabilizers ii':{inertia:-.20},
+ 'nanofiber internal structure i':{inertia:-.131},'nanofiber internal structure ii':{inertia:-.158},
+ 'low friction nozzle joints i':{inertia:-.117},'low friction nozzle joints ii':{inertia:-.14},
+ 'polycarbon engine housing i':{inertia:-.091},'polycarbon engine housing ii':{inertia:-.11},
+ 'hyperspatial velocity optimizer i':{warp:.20},'hyperspatial velocity optimizer ii':{warp:.25},
+ 'limited hyperspatial accelerator':{warpFlat:.20},
+ 'experimental hyperspatial accelerator':{warpFlat:.25},
+ 'prototype hyperspatial accelerator':{warpFlat:.30}
+};
+api.fitEffects=FIT_EFFECTS;
+api.parseEftFit=function(raw){
+ const lines=String(raw||'').split(/\r?\n/),head=(lines[0]||'').match(/^\s*\[([^,\]]+)\s*,\s*([^\]]+)\]\s*$/);
+ if(!head)throw Error('Paste an EVE Copy to Clipboard EFT fit beginning [Hull, Fit name].');
+ const modules=[],unrecognized=[];
+ for(const rawLine of lines.slice(1)){
+  const line=rawLine.trim().replace(/\s*\/offline\s*$/i,'').replace(/\s+x\d+\s*$/i,'');
+  if(!line||line.startsWith('['))continue;
+  const key=Object.keys(FIT_EFFECTS).find(k=>line.toLowerCase()===k||line.toLowerCase().endsWith(' '+k));
+  if(key)modules.push(key);
+  else if(/cargohold|nozzle|hyperspatial|inertia|nanofiber|polycarbon/i.test(line))unrecognized.push(line);
+ }
+ return {hull:head[1].trim(),name:head[2].trim(),modules,unrecognized};
+};
+api.shipHullFromESI=function(data){
+ const attrs=new Map((data?.dogma_attributes||[]).map(a=>[+a.attribute_id,+a.value]));
+ const num=(key,fallback=0)=>Number(attrs.get(key)??fallback)||0;
+ return {general:Number(data?.capacity??num(38))||0,mining:num(1556),mineral:num(1558),
+  fleet:num(912),mass:Number(data?.mass??num(4))||0,inertia:num(70),warp:num(600),maxSpeed:num(37)};
+};
+api.shipStats=function(profile,cargoKind='general'){
+ if(!profile)return null;
+ const base=profile.base||{},modules=Array.isArray(profile.modules)?profile.modules.slice(0,30):[];
+ const effects=modules.map(m=>FIT_EFFECTS[String(m).toLowerCase()]).filter(Boolean);
+ // Cargo capacity bonuses multiply without a stacking penalty. Specialized
+ // holds are not enlarged by ordinary cargo expanders or cargo rigs.
+ const cargoMult=effects.reduce((a,e)=>a*(1+(e.cargo||0)),1);
+ const stack=(field)=>effects.map(e=>e[field]||0).filter(Boolean).sort((a,b)=>Math.abs(b)-Math.abs(a))
+  .reduce((a,n,i)=>a*(1+n*(SHIP_STACK[i]??0)),1);
+ const hullSkill=1+(Number(profile.cargoSkillPct)||0)/100;
+ const general=(Number(base.general)||0)*cargoMult*hullSkill;
+ const mining=(Number(base.mining)||0)*(1+(Number(profile.specialHoldSkillPct)||0)/100);
+ const mineral=(Number(base.mineral)||0)*(1+(Number(profile.specialHoldSkillPct)||0)/100);
+ const fleet=Number(base.fleet)||0;
+ const kind=cargoKind==='ore'||cargoKind==='ice'?'mining':cargoKind==='mineral'?'mineral':'general';
+ const capacity=Number(profile.exactCapacity)>0?Number(profile.exactCapacity):
+  general+fleet+(kind==='mining'?mining:kind==='mineral'?mineral:0);
+ const mass=Number(base.mass)||0,inertia=Number(base.inertia)||0;
+ const computedAlign=mass>0&&inertia>0?Math.log(4)*mass*inertia/1e6*stack('inertia'):null;
+ const computedWarp=Number(base.warp)>0?(Number(base.warp)+effects.reduce((n,e)=>n+(e.warpFlat||0),0))*stack('warp'):null;
+ const align=Number(profile.exactAlign)>0?Number(profile.exactAlign):computedAlign;
+ const warp=Number(profile.exactWarp)>0?Number(profile.exactWarp):computedWarp;
+ return {capacity:capacity>0?capacity:null,align:align>0?align:null,warp:warp>0?warp:null,
+  general,mining,mineral,fleet,kind,source:Number(profile.exactCapacity)>0?'measured':base.general>0?'ESI hull / fit':'unconfigured'};
+};
+// Warp acceleration/cruise/deceleration model; distance in AU, speed in AU/s.
+api.warpSeconds=function(distanceAU,warpAU,maxSubwarp=200){
+ const k=+warpAU,d=+distanceAU;if(!(k>0&&d>0))return null;
+ const j=Math.min(k/3,2),AU=149597870700,maximum=k*AU,breakAt=AU+maximum/j;
+ const peak=d*AU<breakAt?d*AU*k*j/(k+j):maximum;
+ const stop=Math.min(100,Math.max(1,+maxSubwarp/2||100));
+ const cruise=d*AU>breakAt?(d*AU-breakAt)/maximum:0;
+ return Math.max(0,Math.log(Math.max(peak/k,1))/k)+Math.max(0,Math.log(Math.max(peak/stop,1))/j)+cruise;
+};
+// Estimates clearly identify assumed mean warp distance; they do not claim
+// each ESI stargate hop is the same length. Legacy minutes/jump is fallback.
+api.shipTravelMinutes=function(jumps,opts){
+ if(!(Number.isFinite(+jumps)&&+jumps>=0))return null;
+ const ship=opts?.ship,stats=ship&&api.shipStats(ship,opts?.cargoKind||'general');
+ if(!stats?.align||!stats?.warp)return (+jumps)*(+opts.minutesPerJump||2);
+ const au=Math.max(.1,Math.min(250,+opts.averageAU||20)),gateSec=Math.max(0,+opts.gateSeconds||12);
+ const warp=api.warpSeconds(au,stats.warp,+ship.base?.maxSpeed||200);
+ const final=api.warpSeconds(Math.max(.1,au/2),stats.warp,+ship.base?.maxSpeed||200);
+ // Gate-to-gate warp for every crossing; final station approach after last gate.
+ // One local station-to-station warp is assumed for zero-stargate routes.
+ return ((+jumps)*(Math.ceil(stats.align)+warp+gateSec)+Math.ceil(stats.align)+final+15)/60;
 };
 api.formatIsk=function(n,digits=0){return Number.isFinite(n)?new Intl.NumberFormat('en-US',{maximumFractionDigits:digits}).format(n):'—';};
 api.escape=function(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));};
