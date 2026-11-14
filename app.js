@@ -10,7 +10,136 @@ const MAJOR_MARKET_REGIONS=[10000043,10000002,10000030,10000042,10000032];
 const FACTORY_JUPILUXE=Object.freeze({id:'factory-jupiluxe-v1',name:'Jupiluxe',url:'https://music.youtube.com/playlist?list=PLfXw8cc_z-vY&si=Dl5vr0dXqf0enefV',playlistId:'PLfXw8cc_z-vY'});
 const CACHE_TTL=300000; const memCache=new Map();
 const state={resource:'both',system:null,region:null,hub:'all',results:[],selected:null,lastRun:0,inProgress:false,runId:0,coverage:[],failed:0,routeToken:0,routeEstimates:new Map()};
-const ua='4NIK8-Industrial-Command-Preview/0.4.6';
+const ua='4NIK8-Industrial-Command-Preview/0.5.0';
+
+const FACTORY_SHIPS=[
+ {id:'retriever',name:'High on Supply',hull:'Retriever'},
+ {id:'tayra',name:'Tayra',hull:'Tayra'},
+ {id:'miasmos',name:'Miasmos',hull:'Miasmos'},
+ {id:'kryos',name:'Kryos',hull:'Kryos'},
+ {id:'badger',name:'Badger',hull:'Badger'},
+ {id:'crane',name:'Crane',hull:'Crane'},
+ {id:'mastodon',name:'Mastodon',hull:'Mastodon'},
+ {id:'charon',name:'Charon',hull:'Charon'}
+];
+let shipLibrary=FACTORY_SHIPS.map(s=>({...s,base:{},modules:[]}));
+let selectedShips={mining:'retriever',freight:'manual',ore:'manual',trade:'manual'};
+const SHIP_SELECTS={mining:'miningShipSelect',freight:'freightShipSelect',ore:'oreShipSelect',trade:'tradeShipSelect'};
+const SHIP_BASE_FIELDS={general:'shipGeneral',mining:'shipMining',mineral:'shipMineral',fleet:'shipFleet',mass:'shipMass',inertia:'shipInertia',warp:'shipWarp'};
+function chosenShip(role){return shipLibrary.find(s=>s.id===selectedShips[role])||null;}
+function shipOptions(role,kind){
+ const ship=chosenShip(role),stats=ship&&L.shipStats(ship,kind);
+ const manual=Math.max(1,Math.min(1e7,+$('haulCapacity').value||31625));
+ return {ship:stats?.align&&stats?.warp?ship:null,capacity:stats?.capacity||manual,cargoKind:kind};
+}
+function shipMenus(){
+ const options='<option value="manual">MANUAL / LEGACY</option>'+shipLibrary.map(s=>'<option value="'+L.escape(s.id)+'">'+L.escape(s.name)+' · '+L.escape(s.hull)+'</option>').join('');
+ for(const [role,id] of Object.entries(SHIP_SELECTS)){
+  $(id).innerHTML=options;$(id).value=shipLibrary.some(s=>s.id===selectedShips[role])?selectedShips[role]:'manual';
+  selectedShips[role]=$(id).value;
+ }
+ const editor=$('shipLibrarySelect'),v=editor.value;
+ editor.innerHTML=shipLibrary.map(s=>'<option value="'+L.escape(s.id)+'">'+L.escape(s.name)+' · '+L.escape(s.hull)+'</option>').join('');
+ editor.value=shipLibrary.some(s=>s.id===v)?v:shipLibrary[0]?.id||'';
+ shipReadouts();
+}
+function shipReadouts(){
+ for(const role of Object.keys(SHIP_SELECTS)){
+  const p=chosenShip(role),stats=p&&L.shipStats(p,role==='trade'?'general':'ore');
+  $(role+'ShipReadout').textContent=p?(stats?.capacity?L.formatIsk(stats.capacity,1)+' m³':'HOLD UNCONFIGURED')+
+   ' · '+(stats?.align?L.formatIsk(stats.align,1)+'s align':'ALIGN UNCONFIGURED')+
+   ' · '+(stats?.warp?L.formatIsk(stats.warp,2)+' AU/s':'WARP UNCONFIGURED'):
+   'Manual capacity / minutes per jump';
+ }
+ $('haulCapacity').readOnly=!!chosenShip('freight');
+}
+function showShipEditor(){
+ const p=shipLibrary.find(s=>s.id===$('shipLibrarySelect').value);
+ if(!p)return;
+ $('shipName').value=p.name;$('shipHull').value=p.hull;
+ for(const [key,id] of Object.entries(SHIP_BASE_FIELDS))$(id).value=p.base?.[key]||0;
+ $('shipCargoSkill').value=p.cargoSkillPct||0;$('shipHoldSkill').value=p.specialHoldSkillPct||0;
+ $('shipExactCapacity').value=p.exactCapacity||'';$('shipExactAlign').value=p.exactAlign||'';$('shipExactWarp').value=p.exactWarp||'';
+ $('shipModules').value=(p.modules||[]).join('\n');$('shipEft').value='';
+}
+function shipMessage(message){$('shipLibraryStatus').textContent=message;}
+async function fetchHull(p,updateEditor=false){
+ const ids=await resolveNames([p.hull]);
+ const t=(ids.inventory_types||[]).find(x=>x.name.toLowerCase()===p.hull.toLowerCase());
+ if(!t)throw Error('Unknown EVE ship hull '+p.hull);
+ const detail=await request('/universe/types/'+t.id+'/',{},86400000);
+ const base=L.shipHullFromESI(detail);
+ if(!(base.mass>0&&base.inertia>0&&base.warp>0))throw Error('Incomplete ESI ship attributes');
+ p.base=base;p.typeId=t.id;
+ if(updateEditor)for(const [key,id] of Object.entries(SHIP_BASE_FIELDS))$(id).value=base[key]||0;
+ shipReadouts();settingsManager.schedule();
+}
+function validShip(p){
+ const keys=['general','mining','mineral','fleet','mass','inertia','warp','maxSpeed'];
+ if(!/^[a-zA-Z0-9_-]{1,80}$/.test(p.id)||!p.name||p.name.length>64||!p.hull||p.hull.length>64)return false;
+ if(p.modules.length>30||p.modules.some(x=>!L.fitEffects[x]))return false;
+ if(keys.some(k=>!Number.isFinite(+(p.base[k]||0))||+(p.base[k]||0)<0||+(p.base[k]||0)>1e11))return false;
+ return ['cargoSkillPct','specialHoldSkillPct','exactCapacity','exactAlign','exactWarp'].every(k=>Number.isFinite(+p[k])&&+p[k]>=((k.includes('Skill'))?-90:0)&&+p[k]<=1e9);
+}
+function shipInit(){
+ shipMenus();showShipEditor();
+ $('shipLibrarySelect').addEventListener('change',showShipEditor);
+ for(const role of Object.keys(SHIP_SELECTS))$(SHIP_SELECTS[role]).addEventListener('change',()=>{
+  selectedShips[role]=$(SHIP_SELECTS[role]).value;shipReadouts();settingsManager.schedule();
+  const p=chosenShip(role);
+  if(p&&!p.base?.warp)fetchHull(p).then(()=>{if(role==='freight'){repriceFreight();drawRows();}if(role==='ore')miningRefresh();})
+   .catch(e=>shipMessage('ESI ship lookup unavailable · '+e.message));
+  if(role==='freight'&&state.results.length){repriceFreight();drawRows();const item=state.results.find(x=>x.name===state.selected);if(item)selectItem(item.name);}
+  if(role==='ore'||role==='mining')miningRefresh();
+  if(role==='trade'){
+   tradeScanned=[];$('tradeResults').innerHTML='<p class="muted">Ship changed. Rescan trade runs to recalculate cargo quantities and trip times.</p>';
+   tradeStatus('Trade ship changed; rescan needed');
+  }
+ });
+ $('shipNew').addEventListener('click',()=>{
+  $('shipLibrarySelect').value='';$('shipName').value='';$('shipHull').value='';
+  for(const id of Object.values(SHIP_BASE_FIELDS))$(id).value=0;
+  for(const id of ['shipCargoSkill','shipHoldSkill','shipExactCapacity','shipExactAlign','shipExactWarp','shipModules','shipEft'])$(id).value='';
+  shipMessage('New fit: fill fields or import EFT, then save.');
+ });
+ $('shipSave').addEventListener('click',()=>{
+  const current=shipLibrary.find(s=>s.id===$('shipLibrarySelect').value);
+  const rawMods=$('shipModules').value.split(/\r?\n/).map(x=>x.trim().toLowerCase()).filter(Boolean);
+  const modules=rawMods.map(x=>Object.keys(L.fitEffects).find(k=>x===k||x.endsWith(' '+k))||x);
+  const p={id:current?.id||'fit-'+Date.now().toString(36),name:$('shipName').value.trim(),hull:$('shipHull').value.trim(),
+   base:Object.fromEntries(Object.entries(SHIP_BASE_FIELDS).map(([key,id])=>[key,+$(id).value||0])),
+   cargoSkillPct:+$('shipCargoSkill').value||0,specialHoldSkillPct:+$('shipHoldSkill').value||0,
+   exactCapacity:+$('shipExactCapacity').value||0,exactAlign:+$('shipExactAlign').value||0,
+   exactWarp:+$('shipExactWarp').value||0,modules};
+  if(!validShip(p)){shipMessage('Invalid data or unsupported modifier. Use recognized EVE module/rig names.');return;}
+  if(!current&&shipLibrary.length>=32){shipMessage('Ship library is limited to 32 saved fits.');return;}
+  if(current){if(current.hull===p.hull&&current.typeId)p.typeId=current.typeId;Object.assign(current,p);}
+  else shipLibrary.push(p);
+  shipMenus();$('shipLibrarySelect').value=p.id;showShipEditor();settingsManager.schedule();
+  shipMessage('Saved '+p.name+'. Manual fitted overrides include pilot skills and unsupported bonuses.');
+  if(!p.base.warp)fetchHull(shipLibrary.find(x=>x.id===p.id),true).catch(e=>shipMessage('Saved; ESI lookup unavailable · '+e.message));
+  if(state.results.length){repriceFreight();drawRows();miningRefresh();}
+ });
+ $('shipDelete').addEventListener('click',()=>{
+  const id=$('shipLibrarySelect').value,p=shipLibrary.find(s=>s.id===id);if(!p)return;
+  shipLibrary=shipLibrary.filter(s=>s.id!==id);
+  for(const role of Object.keys(selectedShips))if(selectedShips[role]===id)selectedShips[role]='manual';
+  shipMenus();showShipEditor();settingsManager.schedule();shipMessage('Deleted '+p.name+'.');
+ });
+ $('shipImport').addEventListener('click',()=>{
+  try{const fit=L.parseEftFit($('shipEft').value);
+   $('shipName').value=fit.name;$('shipHull').value=fit.hull;$('shipModules').value=fit.modules.join('\n');
+   shipMessage('EFT recognized '+fit.modules.length+' modifiers.'+(fit.unrecognized.length?' Unsupported: '+fit.unrecognized.slice(0,3).join(', '):'')+' Fetch ESI hull, verify fittings/skills, then SAVE.');
+  }catch(e){shipMessage('EFT import: '+e.message);}
+ });
+ $('shipFetch').addEventListener('click',async()=>{
+  const hull=$('shipHull').value.trim();if(!hull){shipMessage('Enter hull name first.');return;}
+  shipMessage('Fetching '+hull+' base attributes from ESI…');
+  try{await fetchHull({hull,base:{}},true);shipMessage('Base attributes loaded. SAVE PROFILE to retain them.');}
+  catch(e){shipMessage('ESI hull data unavailable · '+e.message);}
+ });
+}
+
 const esi='https://esi.evetech.net';
 const COMPAT_DATE='2025-12-16';
 function url(path){return esi+path.replace(/\/(?=\?|$)/,'')+(path.includes('?')?'&':'?')+'datasource=tranquility';}
