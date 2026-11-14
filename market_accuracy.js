@@ -52,6 +52,7 @@ api.orderFitsFilter=function(o,filter){
 api.eligibility=function(order,delivery){
  if(!order?.isBuy||!delivery||!Number.isFinite(+delivery.regionId))return 'unknown';
  if(+delivery.regionId!==+order.regionId)return 'no';
+ if(!Number.isSafeInteger(+delivery.locationId)||+delivery.locationId<1)return 'unknown'; // choose an actual delivery station before claiming eligibility
  const range=order.range;
  if(range==='region')return 'yes';
  if(range==='station')return Number(delivery.locationId)>0?
