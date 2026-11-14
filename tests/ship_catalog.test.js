@@ -98,7 +98,7 @@ new Function('window','document','fetch','localStorage','setTimeout','clearTimeo
  assert.equal(win.__test.getSelections().freight,'manual');
  assert(calls.some(url=>url.includes('/universe/categories/6')));
  // Copy-paste an EFT fit in Advanced; a single click imports, loads ESI and saves.
- element('shipEft').value='[Retriever, Test Ore Rig]\\nExpanded Cargohold II';
+ element('shipEft').value='[Retriever, Test Ore Rig]\nExpanded Cargohold II';
  await element('shipImport').listeners.click();
  assert(win.__test.getLibrary().some(x=>x.name==='Test Ore Rig'));
  assert.equal(win.__test.getLibrary().find(x=>x.name==='Test Ore Rig').base.mining,27500);
