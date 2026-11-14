@@ -6,7 +6,7 @@ const MAJOR_MARKET_REGIONS=[10000043,10000002,10000030,10000042,10000032];
 const FACTORY_JUPILUXE=Object.freeze({id:'factory-jupiluxe-v1',name:'Jupiluxe',url:'https://music.youtube.com/playlist?list=PLfXw8cc_z-vY&si=Dl5vr0dXqf0enefV',playlistId:'PLfXw8cc_z-vY'});
 const CACHE_TTL=300000; const memCache=new Map();
 const state={resource:'both',system:null,region:null,hub:'all',results:[],selected:null,lastRun:0,inProgress:false,runId:0,coverage:[],failed:0,routeToken:0,routeEstimates:new Map()};
-const ua='4NIK8-Industrial-Command-Preview/0.6.1';
+const ua='4NIK8-Industrial-Command-Preview/0.6.2';
 
 const FACTORY_SHIPS=[
  {id:'retriever',name:'Retriever',hull:'Retriever'},
@@ -197,7 +197,7 @@ function shipCatalogInit(){
  return fresh?Promise.resolve():fetchShipCatalog(); // Nonblocking when called during UI startup.
 }
 function shipMenus(){
- const saved='<optgroup label="Saved ship profiles">'+shipLibrary.map(s=>'<option value="'+L.escape(s.id)+'">'+L.escape(s.name)+' · '+L.escape(s.hull)+'</option>').join('')+'</optgroup>';
+ const saved='<optgroup label="Your saved ships">'+shipLibrary.map(s=>'<option value="'+L.escape(s.id)+'">'+L.escape(s.name===s.hull?s.hull:s.name+' · '+s.hull)+'</option>').join('')+'</optgroup>';
  const addable=shipCatalog.filter(s=>!shipLibrary.some(p=>p.typeId===s.id||p.hull.toLowerCase()===s.name.toLowerCase()));
  const all=addable.length?'<optgroup label="EVE ship catalog · select to add">'+addable.map(s=>'<option value="catalog:'+s.id+'">'+L.escape(s.name)+' · '+L.escape(s.group)+'</option>').join('')+'</optgroup>':'';
  const options='<option value="manual">MANUAL / LEGACY</option>'+saved+all;
@@ -206,7 +206,7 @@ function shipMenus(){
   selectedShips[role]=$(id).value;
  }
  const editor=$('shipLibrarySelect'),v=editor.value;
- editor.innerHTML=shipLibrary.map(s=>'<option value="'+L.escape(s.id)+'">'+L.escape(s.name)+' · '+L.escape(s.hull)+'</option>').join('');
+ editor.innerHTML=shipLibrary.map(s=>'<option value="'+L.escape(s.id)+'">'+L.escape(s.name===s.hull?s.hull:s.name+' · '+s.hull)+'</option>').join('');
  editor.value=shipLibrary.some(s=>s.id===v)?v:shipLibrary[0]?.id||'';
  shipReadouts();
 }
@@ -220,14 +220,67 @@ function shipReadouts(){
  }
  $('haulCapacity').readOnly=!!L.shipStats(chosenShip('freight'),'ore')?.capacity;
 }
+const fetchingShipHulls=new Map(),failedShipHulls=new Map();
+function shipQuickSummary(p){
+ const box=$('shipQuickStats');
+ if(!p){
+  box.innerHTML='<span class="ship-info-wait">Choose a ship above. It will be saved here automatically.</span>';return;
+ }
+ const data=p.base||{},present=data.warp>0&&data.mass>0&&data.inertia>0;
+ const fmt=(n,d=0)=>Number(n)>0?L.formatIsk(+n,d):'—';
+ const stats=L.shipStats(p,'general');
+ const views=[
+  ['General cargo',fmt(stats?.general,0),'m³'],
+  ['Mining hold',fmt(stats?.mining,0),'m³'],
+  ['Mineral hold',fmt(stats?.mineral,0),'m³'],
+  ['Align time',fmt(stats?.align,1),'sec'],
+  ['Warp speed',fmt(stats?.warp,2),'AU/s']
+ ];
+ box.innerHTML='<div class="ship-quick-heading"><strong>'+L.escape(p.name===p.hull?p.hull:p.name+' · '+p.hull)+
+  '</strong><span class="'+(present?'ship-esistatus-ready':'ship-esistatus-loading')+'">'+
+  (present?'HULL DATA LOADED':'FETCHING HULL DATA…')+'</span></div>'+
+  '<div class="ship-stat-cards">'+views.map(([name,n,unit])=>'<div class="ship-stat-card"><small>'+
+    L.escape(name)+'</small><strong>'+n+'</strong><span>'+unit+'</span></div>').join('')+'</div>'+
+  '<p class="ship-info-help">Basic values come from CCP ESI and your saved fitting. A ship\'s exact fitted capacity, align and bonuses may change with skills, rigs and modules. Personal adjustments are optional below.</p>';
+}
+function ensureHullAttributes(p,force=false){
+ if(!p)return Promise.resolve();
+ if(!force&&p.base?.warp>0&&p.base?.mass>0&&p.base?.inertia>0)return Promise.resolve(p);
+ if(fetchingShipHulls.has(p.id))return fetchingShipHulls.get(p.id);
+ if(!force&&failedShipHulls.has(p.id))return Promise.resolve();
+ const job=(async()=>{
+  try{
+   await fetchHull(p,true);
+   failedShipHulls.delete(p.id);
+   shipMessage('Ready · '+p.hull+' base hull stats loaded and stored automatically. Only personal fit bonuses need optional adjustments.');
+   return p;
+  }catch(err){
+   failedShipHulls.set(p.id,err.message);
+   if($('shipLibrarySelect').value===p.id)
+    shipMessage('Base hull data unavailable · '+err.message+' · Retry in optional Technical Tools if needed.');
+   return null;
+  }finally{
+   fetchingShipHulls.delete(p.id);
+   if($('shipLibrarySelect').value===p.id)shipQuickSummary(p);
+  }
+ })();
+ fetchingShipHulls.set(p.id,job);
+ return job;
+}
 function showShipEditor(){
  const p=shipLibrary.find(s=>s.id===$('shipLibrarySelect').value);
- if(!p)return;
- $('shipName').value=p.name;$('shipHull').value=p.hull;
- for(const [key,id] of Object.entries(SHIP_BASE_FIELDS))$(id).value=p.base?.[key]||0;
+ if(!p){shipQuickSummary(null);return;}
+ $('shipName').value=p.name;$('shipHull').value=p.hull;$('shipHull').readOnly=true;
+ for(const [key,id] of Object.entries(SHIP_BASE_FIELDS)){
+  $(id).value=p.base?.[key]||0;
+  $(id).readOnly=true;
+ }
+ $('shipManualBase').textContent='ENABLE MANUAL BASE EDITING';
  $('shipCargoSkill').value=p.cargoSkillPct||0;$('shipHoldSkill').value=p.specialHoldSkillPct||0;
  $('shipExactCapacity').value=p.exactCapacity||'';$('shipExactKind').value=p.exactCapacityKind||'general';$('shipExactAlign').value=p.exactAlign||'';$('shipExactWarp').value=p.exactWarp||'';
  $('shipModules').value=(p.modules||[]).join('\n');$('shipEft').value='';
+ shipQuickSummary(p);
+ if(!(p.base?.warp>0&&p.base?.mass>0&&p.base?.inertia>0))ensureHullAttributes(p);
 }
 function shipMessage(message){$('shipLibraryStatus').textContent=message;}
 async function fetchHull(p,updateEditor=false){
@@ -248,7 +301,10 @@ async function fetchHull(p,updateEditor=false){
  if(!(base.mass>0&&base.inertia>0&&base.warp>0))throw Error('Incomplete ESI ship attributes; enter fitted stats manually');
  p.base=base;p.typeId=id;
  if(typeof detail.name==='string'&&detail.name.trim())p.hull=detail.name.trim();
- if(updateEditor)for(const [key,field] of Object.entries(SHIP_BASE_FIELDS))$(field).value=base[key]||0;
+ if(updateEditor&&$('shipLibrarySelect').value===p.id){
+  for(const [key,field] of Object.entries(SHIP_BASE_FIELDS))$(field).value=base[key]||0;
+  shipQuickSummary(p);
+ }
  shipReadouts();settingsManager.schedule();
 }
 function validShip(p){
