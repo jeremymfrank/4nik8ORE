@@ -11,6 +11,7 @@ $backupFile = Join-Path $dataRoot 'settings.json.bak'
 $types = @{
   '/'='text/html; charset=utf-8'; '/index.html'='text/html; charset=utf-8';
   '/app.js'='text/javascript; charset=utf-8'; '/logic.js'='text/javascript; charset=utf-8';
+  '/market_explorer.js'='text/javascript; charset=utf-8'; '/resource_catalog.js'='text/javascript; charset=utf-8';
   '/styles.css'='text/css; charset=utf-8'; '/assets/4nik8-banner.webp'='image/webp'; '/assets/4nik8-corp-emblem.png'='image/png'
 }
 $utf8 = [System.Text.UTF8Encoding]::new($false)
@@ -22,7 +23,7 @@ catch {
     Write-Host 'IMPORTANT: close the previous server window before running an updated version.'
     exit 1
 }
-Write-Host "4NIK8 Industrial Command v0.5.2 - $prefix" -ForegroundColor Cyan
+Write-Host "4NIK8 Industrial Command v0.6.0 - $prefix" -ForegroundColor Cyan
 Write-Host "Saved channels and preferences: $settingsFile"
 Write-Host 'Keep this window running. Ctrl+C closes the application server.'
 Start-Process $prefix
