@@ -238,7 +238,7 @@ function shipQuickSummary(p){
  ];
  box.innerHTML='<div class="ship-quick-heading"><strong>'+L.escape(p.name===p.hull?p.hull:p.name+' · '+p.hull)+
   '</strong><span class="'+(present?'ship-esistatus-ready':'ship-esistatus-loading')+'">'+
-  (present?'HULL DATA LOADED':'FETCHING HULL DATA…')+'</span></div>'+
+  (present?'HULL STATS READY':failedShipHulls.has(p.id)?'ESI UNAVAILABLE · SAVED FIT KEPT':'FETCHING HULL DATA…')+'</span></div>'+
   '<div class="ship-stat-cards">'+views.map(([name,n,unit])=>'<div class="ship-stat-card"><small>'+
     L.escape(name)+'</small><strong>'+n+'</strong><span>'+unit+'</span></div>').join('')+'</div>'+
   '<p class="ship-info-help">Basic values come from CCP ESI and your saved fitting. A ship\'s exact fitted capacity, align and bonuses may change with skills, rigs and modules. Personal adjustments are optional below.</p>';
@@ -363,7 +363,7 @@ function shipInit(){
   const rawMods=$('shipModules').value.split(/\r?\n/).map(x=>x.trim().toLowerCase()).filter(Boolean);
   const modules=rawMods.map(x=>Object.keys(L.fitEffects).find(k=>x===k||x.endsWith(' '+k))||x);
   const p={id:current?.id||'fit-'+Date.now().toString(36),name:$('shipName').value.trim(),hull:$('shipHull').value.trim(),
-   base:Object.fromEntries(Object.entries(SHIP_BASE_FIELDS).map(([key,id])=>[key,+$(id).value||0])),
+   base:{...Object.fromEntries(Object.entries(SHIP_BASE_FIELDS).map(([key,id])=>[key,+$(id).value||0])),maxSpeed:+current?.base?.maxSpeed||0},
    cargoSkillPct:+$('shipCargoSkill').value||0,specialHoldSkillPct:+$('shipHoldSkill').value||0,
    exactCapacity:+$('shipExactCapacity').value||0,exactCapacityKind:$('shipExactKind').value,exactAlign:+$('shipExactAlign').value||0,
    exactWarp:+$('shipExactWarp').value||0,modules};
