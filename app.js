@@ -1267,7 +1267,9 @@ const settingsManager=(()=>{
   rememberMiningCalibration();
   return {schemaVersion:1,livery:readLocal(keys.livery,'neon'),
    radio:{volume:Number.isFinite(n)?Math.max(0,Math.min(100,n)):55,shuffle:readLocal(keys.shuffle,'0')==='1',channels:channels.slice(0,40),selectedChannelId:readLocal(keys.last,'')},
-   scanner:{system:$('systemInput').value.trim(),hub:$('hubSelect').value,resource:state.resource,cargo:Math.max(1,Math.trunc(+$('cargoVolume').value||31625)),resourceIds:window.ICResourceBrowser.selected()},haul:{...freightInputs(),capacity:Math.max(1,+$('haulCapacity').value||31625)},mining:miningSnapshot(),trade:tradeSettings(),ships:{library:shipLibrary,selections:selectedShips}};
+   scanner:{system:$('systemInput').value.trim(),hub:$('hubSelect').value,resource:state.resource,cargo:Math.max(1,Math.trunc(+$('cargoVolume').value||31625)),resourceIds:window.ICResourceBrowser.selected()},haul:((h)=>({capacity:Math.max(1,+$('haulCapacity').value||31625),taxPct:h.taxPct,cashPerJump:h.cashPerJump,
+   minutesPerJump:h.minutesPerJump,averageAU:h.averageAU,pilotISKHour:h.pilotISKHour,preference:h.preference}))(freightInputs()),
+   mining:miningSnapshot(),trade:tradeSettings(),ships:{library:shipLibrary,selections:selectedShips}};
  }
  function apply(data){
   if(!data||data.schemaVersion!==1)return;
@@ -1324,10 +1326,14 @@ const settingsManager=(()=>{
  function save(){
   // Capture at execution time to avoid a queued stale write reverting newer settings.
   queue=queue.catch(()=>{}).then(async()=>{
-   try{const res=await fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(capture())});
-    if(!res.ok)throw Error('HTTP '+res.status);
-    notify('SETTINGS SAVED TO WINDOWS');
-   }catch(e){notify('LOCAL BACKUP ONLY · '+e.message);}
+   try{
+    const res=await fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(capture())});
+    if(!res.ok){
+     let detail='';try{const error=await res.json();detail=String(error.error||error.message||'').slice(0,170);}catch(_){}
+     throw Error('HTTP '+res.status+(detail?' · '+detail:' · check the Windows server console'));
+    }
+    notify('SETTINGS SAVED TO WINDOWS · '+new Date().toLocaleTimeString());
+   }catch(e){notify('SETTINGS NOT SAVED · '+e.message);}
   });return queue;
  }
  function schedule(){if(!started)return;clearTimeout(timer);timer=setTimeout(save,450);}
