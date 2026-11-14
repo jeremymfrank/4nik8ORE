@@ -33,6 +33,7 @@
       </section>
       <section class="profit panel">
         <div class="section-name"><span class="ordinal">02</span> OPPORTUNITY BOARD <span class="line"></span><span class="small-label">ORDER BOOK / ISK·M³</span></div>
+        <div class="section-ship-row"><label class="field"><span>ORE / ICE PROFIT HAULER</span><select id="oreShipSelect" aria-label="Ore and ice opportunity hauling ship"></select></label><span class="ship-readout" id="oreShipReadout"></span></div>
         <div class="headline"><div><div class="muted smallcaps">BEST QUOTED OPPORTUNITY</div><div class="headline-name" id="bestName">Awaiting live data</div></div><div class="headline-value"><span id="bestPrice">—</span><small id="headlineUnit">ISK / mined m³ · GROSS</small></div></div>
         <div class="notice" id="notice" role="status">Live orders show where buyers exist, NOT whether a mining deposit exists in your system. Freight and mining rates are estimates based on your settings; PvP exposure, docking access and processing fees remain unverified.</div>
         <div class="sort-strip"><span>RESOURCE / FORM</span><span>BEST REGIONAL BUY ORDERS</span></div>
@@ -41,11 +42,13 @@
       </section>
       <section class="detail panel">
         <div class="section-name"><span class="ordinal">03</span> FREIGHT PROFIT ANALYZER <span class="line"></span><span class="small-label">LIVE BUYERS / EST. NET RETURN</span></div>
+        <div class="section-ship-row"><label class="field"><span>FREIGHT SHIP</span><select id="freightShipSelect" aria-label="Freight Profit Analyzer ship"></select></label><span class="ship-readout" id="freightShipReadout"></span></div>
         <div class="freight-settings" aria-label="Hauling profitability assumptions">
-          <label class="field"><span>HAUL CAPACITY · m³</span><input id="haulCapacity" type="number" min="1" max="10000000" value="31625"></label>
+          <label class="field"><span>MANUAL HAUL CAPACITY · m³</span><input id="haulCapacity" type="number" min="1" max="10000000" value="31625"></label>
           <label class="field"><span>SALES TAX · % (EST.)</span><input id="haulTax" type="number" min="0" max="100" step="0.1" value="7.5"></label>
           <label class="field"><span>CASH EXPENSE · ISK/JUMP (OPTIONAL)</span><input id="haulCostJump" type="number" min="0" max="100000000" step="1000" value="0" title="Normally 0 ISK/jump when hauling your own cargo through stargates. Ship fuel or courier costs can be entered when relevant."></label>
-          <label class="field"><span>MINUTES PER JUMP</span><input id="haulMinutesJump" type="number" min="0.1" max="120" step="0.5" value="2"></label>
+          <label class="field"><span>FALLBACK MIN / JUMP (IF SHIP DATA MISSING)</span><input id="haulMinutesJump" type="number" min="0.1" max="120" step="0.5" value="2"></label>
+          <label class="field"><span>AVERAGE WARP DISTANCE · AU / GATE</span><input id="haulAverageAU" type="number" min="0.1" max="250" step="1" value="20" title="Estimate until actual gate-to-gate coordinates are available."></label>
           <label class="field"><span>PILOT TIME · ISK/HR</span><input id="haulTimeValue" type="number" min="0" max="1000000000" step="100000" value="0"></label>
           <label class="field"><span>STARGATE ROUTE</span><select id="haulRoutePref"><option value="Safer">SAFER</option><option value="Shorter">SHORTER</option><option value="LessSecure">LESS SECURE</option></select></label>
         </div>
@@ -53,9 +56,10 @@
       </section>
       <section class="mining panel" id="miningPanel">
         <div class="section-name"><span class="ordinal">04</span> MINING PERFORMANCE <span class="line"></span><span class="small-label">REAL RATES / REAL ISK·HOUR</span></div>
+        <div class="section-ship-row"><label class="field"><span>MINING SHIP</span><select id="miningShipSelect" aria-label="Mining Performance ship"></select></label><span class="ship-readout" id="miningShipReadout"></span></div>
         <div class="mining-intro">One ship profile feeds every resource in the market scan. Enter your fitted mining-cycle values once, or time a real session to calibrate an observed rate. No guessed Retriever performance.</div>
         <div class="mining-profile-grid">
-          <label class="field mining-profile-name"><span>SHIP PROFILE</span><input type="text" id="miningProfileName" maxlength="56" value="High on Supply / Retriever" aria-label="Mining ship profile name"></label>
+          <label class="field mining-profile-name"><span>MINING CALIBRATION NAME</span><input type="text" id="miningProfileName" maxlength="56" value="High on Supply / Retriever" aria-label="Mining ship profile name"></label>
           <label class="field"><span>UPTIME · % (THEORETICAL)</span><input type="number" id="miningUptime" min="1" max="100" step="1" value="100" title="Percentage of theoretical laser time spent mining. Not applied to measured session rates."></label>
         </div>
         <div class="mining-config">
@@ -91,6 +95,7 @@
       </section>
       <section class="trade panel" id="tradePanel">
         <div class="section-name"><span class="ordinal">05</span> TRADE RUN SCANNER <span class="line"></span><span class="small-label">BUY LOW / SELL HIGH</span></div>
+        <div class="section-ship-row"><label class="field"><span>TRADING SHIP</span><select id="tradeShipSelect" aria-label="Trade Run ship"></select></label><span class="ship-readout" id="tradeShipReadout"></span></div>
         <p class="trade-intro">Find cross-region NPC-station purchase and resale opportunities. Quotes use real buy/sell order quantities, cargo volume, available ISK and stargate routes. No mining required.</p>
         <form id="tradeForm">
           <div class="trade-inputs">
@@ -106,6 +111,37 @@
         <div id="tradeStatus" class="trade-status" role="status" aria-live="polite">Ready · uses operating system, coverage, freight capacity, sales tax and route settings above.</div>
         <div id="tradeResults" class="trade-results"><p class="muted">No live trade opportunities scanned. Enter a purchase budget and scan the goods you want to haul.</p></div>
         <p class="trade-note">Estimates only. Public orders can change before arrival. NPC stations only; buyer ranges beyond the order station, PvP risk, and price movement are not guaranteed. Buying at existing sell orders and selling to existing buy orders do not require posting new orders.</p>
+      </section>
+      <section class="ship-library panel" id="shipLibraryPanel">
+        <div class="section-name"><span class="ordinal">06</span> SHIP FITTING LIBRARY <span class="line"></span><span class="small-label">ONE LIBRARY / INDEPENDENT SECTION SHIPS</span></div>
+        <p class="ship-note">Select a saved fit in each section above. Public ESI loads base hull attributes; recognized EFT modules and rigs adjust ordinary cargo, align and warp performance. Enter your actual fitted values to account for skills, implants, hull bonuses, or unsupported modules.</p>
+        <div class="ship-editor-grid">
+          <label class="field ship-wide"><span>EDIT SAVED SHIP PROFILE</span><select id="shipLibrarySelect" aria-label="Ship profile to edit"></select></label>
+          <label class="field"><span>PROFILE NAME</span><input id="shipName" type="text" maxlength="64" placeholder="e.g. High on Supply"></label>
+          <label class="field"><span>HULL (EVE NAME)</span><input id="shipHull" type="text" maxlength="64" placeholder="e.g. Tayra"></label>
+          <label class="field"><span>BASE GENERAL CARGO · m³</span><input id="shipGeneral" type="number" min="0" max="100000000" step="any"></label>
+          <label class="field"><span>BASE MINING HOLD · m³</span><input id="shipMining" type="number" min="0" max="100000000" step="any"></label>
+          <label class="field"><span>BASE MINERAL HOLD · m³</span><input id="shipMineral" type="number" min="0" max="100000000" step="any"></label>
+          <label class="field"><span>BASE FLEET HANGAR · m³</span><input id="shipFleet" type="number" min="0" max="100000000" step="any"></label>
+          <label class="field"><span>BASE MASS · kg</span><input id="shipMass" type="number" min="0" max="10000000000" step="any"></label>
+          <label class="field"><span>BASE INERTIA MODIFIER</span><input id="shipInertia" type="number" min="0" max="100" step="any"></label>
+          <label class="field"><span>BASE WARP · AU/s</span><input id="shipWarp" type="number" min="0" max="100" step="any"></label>
+          <label class="field"><span>CARGO SKILL BONUS · %</span><input id="shipCargoSkill" type="number" min="-90" max="300" step="any" value="0"></label>
+          <label class="field"><span>SPECIAL HOLD SKILL BONUS · %</span><input id="shipHoldSkill" type="number" min="-90" max="300" step="any" value="0"></label>
+          <label class="field"><span>EXACT FITTED CAPACITY · m³ (OPTIONAL)</span><input id="shipExactCapacity" type="number" min="0" max="100000000" step="any" placeholder="Override selected cargo type"></label>
+          <label class="field"><span>EXACT FITTED ALIGN · sec (OPTIONAL)</span><input id="shipExactAlign" type="number" min="0" max="100000" step="any" placeholder="From in-game fitting"></label>
+          <label class="field"><span>EXACT FITTED WARP · AU/s (OPTIONAL)</span><input id="shipExactWarp" type="number" min="0" max="100" step="any" placeholder="From in-game fitting"></label>
+          <label class="field ship-wide"><span>RECOGNIZED MODULES / RIGS (ONE PER LINE)</span><textarea id="shipModules" rows="3" placeholder="Expanded Cargohold II&#10;Medium Hyperspatial Velocity Optimizer I"></textarea></label>
+          <label class="field ship-wide"><span>PASTE AN EVE FIT (EFT FORMAT) · OPTIONAL</span><textarea id="shipEft" rows="3" placeholder="[Tayra, Cargo Runner]&#10;Expanded Cargohold II&#10;..."></textarea></label>
+        </div>
+        <div class="ship-actions">
+          <button type="button" id="shipNew">NEW SHIP</button>
+          <button type="button" id="shipImport">IMPORT EFT</button>
+          <button type="button" id="shipFetch">FETCH HULL FROM ESI</button>
+          <button type="button" id="shipSave" class="ship-save">SAVE PROFILE</button>
+          <button type="button" id="shipDelete">DELETE</button>
+        </div>
+        <div id="shipLibraryStatus" role="status" class="ship-library-status">Saved fitting profiles are stored with your existing Windows settings backup.</div>
       </section>
       <section class="radio panel">
         <div class="radio-header"><div class="radio-mark" aria-hidden="true">◉</div><div class="grow"><div class="eyebrow">CH 19 / 4NIK8 ORE ENTERTAINMENT</div><h2>CB ContraBand Radio</h2><div class="radio-tagline">If CONCORD asks, you ain't heard nothin'.</div></div><button class="radio-collapse" id="radioCollapse" aria-expanded="true" title="Collapse radio">▾</button></div>
@@ -132,7 +168,7 @@
           <audio id="audioPlayer" preload="none"></audio>
         </div>
       </section>
-      <footer class="bottom"><span>4NIK8 ORE / INDUSTRIAL RECLAMATION</span><span class="version">PREVIEW v0.4.6 · LOCAL WINDOWS</span></footer>
+      <footer class="bottom"><span>4NIK8 ORE / INDUSTRIAL RECLAMATION</span><span class="version">PREVIEW v0.5.0 · LOCAL WINDOWS</span></footer>
     </main>
   </div>
   <script src="logic.js"></script>
