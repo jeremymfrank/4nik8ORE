@@ -286,6 +286,40 @@ async function deliveryFromInputs(local){
   throw Error('Delivery station #'+id+' is not in '+local.systemName+'. Correct the station ID or operating system.');
  return {...base,locationId:id,stationName:detail.name||'Station #'+id};
 }
+async function verifyJumpRadiusRoutes(delivery,regionalOrders){
+ if(!delivery?.locationId)return {verified:0,unknown:0};
+ const radiusOrders=regionalOrders.filter(o=>o.isBuy&&/^\d+$/.test(o.range)&&
+  Accuracy.ORDER_RANGES.has(o.range));
+ const issuerSystems=[...new Set(radiusOrders.map(o=>o.systemId))];
+ const chosen=issuerSystems.slice(0,12);
+ const data={};let verified=0,unknown=issuerSystems.length-chosen.length;
+ const cacheRegions=new Map([[delivery.systemId,delivery.regionId]]);
+ const regionOf=async systemId=>{
+  if(cacheRegions.has(systemId))return cacheRegions.get(systemId);
+  const sys=await esi('/universe/systems/'+systemId+'/',{ttl:DAY});
+  const constellation=await esi('/universe/constellations/'+sys.constellation_id+'/',{ttl:DAY});
+  cacheRegions.set(systemId,+constellation.region_id);return +constellation.region_id;
+ };
+ await pool(chosen.map(issuer=>async()=>{
+  if(issuer===delivery.systemId)return {issuer,jumps:0};
+  const route=await esi('/route/'+issuer+'/'+delivery.systemId+'/',{
+   method:'POST',body:JSON.stringify({preference:'Shorter',security_penalty:50}),ttl:DAY
+  });
+  const path=Array.isArray(route)?route:route?.route;
+  if(!Array.isArray(path)||+path[0]!==issuer||+path[path.length-1]!==delivery.systemId)
+   throw Error('Unverified ESI stargate route');
+  // EVE orders are region-bound. Do NOT count a shortcut crossing another
+  // region as proof a numeric buy range is usable in the issuing region.
+  for(const systemId of path)if(await regionOf(+systemId)!==delivery.regionId)
+   throw Error('The returned stargate path crosses a region boundary');
+  return {issuer,jumps:path.length-1};
+ }),2,(_,result,error)=>{
+  if(error||!result){unknown++;return;}
+  data[result.issuer]=result.jumps;verified++;
+ });
+ delivery.gateDistanceByIssuer=data;
+ return {verified,unknown};
+}
 function orderLocation(o){
  return o?.stationName||o?.systemName&&o.systemName+' · '+(o.isStructure?'structure':'location')+' #'+o.locationId||
   (o?'Location #'+o.locationId:'—');
@@ -478,6 +512,8 @@ function renderResults(){
   ' public ESI regions · '+lastScan.pages+' market-order pages · '+allOrders().length.toLocaleString()+
   ' validated order records · '+lastScan.failed+' failed/unavailable regions · ESI snapshot '+new Date(lastScan.stamp).toLocaleString()+
   ' · '+(filter==='npc'?'NPC-ONLY FILTER':'ALL PUBLIC (STRUCTURES FLAGGED)')+
+  (lastScan.delivery?.locationId?' · numeric range routes verified: '+lastScan.rangeChecks.verified+
+    ' · unresolved: '+lastScan.rangeChecks.unknown:' · no delivery station set; range eligibility unknown')+
   '. Failed regions are not treated as empty markets.');
 }
 async function explore(){
@@ -513,7 +549,10 @@ async function explore(){
   if(token!==scanCount)return;
   if(!data.length)throw Error('No public regional order books could be validated; no best prices can be established.');
   data.sort((a,b)=>a.name.localeCompare(b.name));
-  lastScan={item,regions:data,failed:errors,total:selected.length,pages,local,delivery,stamp:Date.now()};
+  const localOrders=delivery?.locationId?data.find(r=>r.id===delivery.regionId)?.orders||[]:[];
+  const rangeChecks=await verifyJumpRadiusRoutes(delivery,localOrders);
+  lastScan={item,regions:data,failed:errors,total:selected.length,pages,local,delivery,
+   rangeChecks,stamp:Date.now()};
   auditPage=0;
   const basic=data.map(x=>summarize(x.orders,x));
   await describeOrders(basic);
