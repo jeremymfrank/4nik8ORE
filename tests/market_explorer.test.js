@@ -59,16 +59,22 @@ async function fetch(url,opts={}){
   data={type_id:id,name:fakeNames.get(id),volume:id===1005?2000:1,
    market_group_id:group?.market_group_id||0,published:true};
  }else if(pathname==='/universe/regions/')data=[10000002,10000043,11000001];
- else if(pathname.startsWith('/markets/10000002/orders/'))data=[
-  orders(1,{price:20,volume_remain:200,volume_total:250}),
-  orders(2,{price:18,volume_remain:80,volume_total:100,is_buy_order:true,range:'region',location_id:60000002})
- ];
+ else if(pathname.startsWith('/markets/10000002/orders/')){
+  data=String(url).includes('page=2')?[
+   orders(5,{price:17,volume_remain:33,volume_total:60,is_buy_order:true,range:'3',
+    location_id:60000002,min_volume:7})
+  ]:[
+   orders(1,{price:20,volume_remain:200,volume_total:250}),
+   orders(2,{price:18,volume_remain:80,volume_total:100,is_buy_order:true,range:'region',location_id:60000002})
+  ];
+ }
  else if(pathname.startsWith('/markets/10000043/orders/'))data=[
   orders(3,{price:25,volume_remain:150,volume_total:200,location_id:60000101,system_id:30002187}),
   orders(4,{price:30,volume_remain:70,volume_total:90,location_id:60000102,system_id:30002187,is_buy_order:true,min_volume:10,range:'solarsystem'})
  ];
  else throw Error('Unexpected URL '+url);
- return {ok:true,headers:{get:()=>null},json:async()=>data};
+ return {ok:true,headers:{get:k=>k==='X-Pages'&&pathname.startsWith('/markets/10000002/orders/')&&
+  !String(url).includes('page=2')?'2':null},json:async()=>data};
 }
 const run=new Function('window','document','localStorage','fetch','setTimeout','clearTimeout','AbortController','CustomEvent','URL',marketCode);
 run(window,document,localStorage,fetch,setTimeout,clearTimeout,AbortController,class{constructor(type){this.type=type;}},URL);
@@ -107,6 +113,9 @@ const M=window.ICMarketExplorer,R=window.ICResourceBrowser;
  assert(el('marketExplorerTable').innerHTML.includes('The Forge'),'market explorer regional table created');
  assert(el('marketAuditTable').innerHTML.includes('30.00'),'regional highest bid matches ESI cents');
  assert(el('marketAuditTable').innerHTML.includes('Solar System'),'raw range preserved');
+ assert(el('marketExplorerStatus').textContent.includes('3 market-order pages'),'all paginated region orders fetched');
+ assert(el('marketAuditSummary').textContent.includes('5 total validated ESI records'),'ESI order totals include page 2');
+ assert(el('marketAuditTable').innerHTML.includes('3 jumps'),'numeric EVE buy-order ranges visible');
  assert(el('marketAuditTable').innerHTML.includes('70'),'remaining quantity preserved');
  assert(el('marketQuantitySummary').innerHTML.includes('15 units'),'quantity quote generated');
 
