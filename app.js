@@ -1176,10 +1176,13 @@ function candidateTradeRuns(types,regions,books,options){
 }
 function tradeCard(run,i){
  const esc=L.escape,r=run.estimate,price=n=>L.formatIsk(n),num=n=>L.formatIsk(n,2);
- return '<article class="trade-run '+(i===0?'best':'')+'">'+
-  '<div class="trade-run-name">'+(i+1)+'. '+esc(run.item.name)+' · '+num(run.quote.units)+' units / '+num(run.quote.volume)+' m³</div>'+
-  '<div class="trade-run-price"><div><small>NET CASH / RUN</small><strong>'+price(r.profit)+' ISK</strong></div><div><small>NET ISK / HOUR</small><strong>'+price(r.iskHour)+'</strong></div></div>'+
-  '<div class="trade-run-points">'+
+ return '<details class="trade-run '+(i===0?'best':'')+'">'+
+  '<summary class="trade-run-summary"><span class="trade-run-name">'+(i+1)+'. '+esc(run.item.name)+
+  ' · '+num(run.quote.units)+' units / '+num(run.quote.volume)+' m³</span>'+
+  '<span class="trade-run-price"><span><small>EST. NET / RUN</small><strong>'+price(r.profit)+' ISK</strong></span>'+
+  '<span><small>EST. NET / HOUR</small><strong>'+price(r.iskHour)+' ISK</strong></span></span>'+
+  '<span class="trade-open-hint">DETAILS ▾</span></summary>'+
+  '<div class="trade-run-body"><div class="trade-run-points">'+
   '<div><span>BUY / PICKUP</span><strong><span data-trade-loc="'+run.quote.sourceId+'">Station #'+run.quote.sourceId+'</span> · '+esc(MARKETS[run.source.region]||String(run.source.region))+'</strong></div>'+
   '<div><span>SELL / DELIVER</span><strong><span data-trade-loc="'+run.quote.destId+'">Station #'+run.quote.destId+'</span> · '+esc(MARKETS[run.dest.region]||String(run.dest.region))+'</strong></div>'+
   '<div><span>BUY COST / CAPITAL</span><strong>'+price(r.cost)+' ISK</strong></div>'+
@@ -1189,7 +1192,7 @@ function tradeCard(run,i){
   '<div><span>RETURN ON CAPITAL</span><strong>'+num(r.roi)+'%</strong></div>'+
   '<div><span>JUMPS (START / LOADED / RETURN)</span><strong>'+r.jumpPickup+' / '+r.jumpLoaded+' / '+r.jumpHome+'</strong></div>'+
   '<div><span>EST. TIME / ONE RUN</span><strong>'+num(r.minutes)+' minutes</strong></div></div>'+
-  '<div class="trade-run-footer">NPC stations · matched public market orders · quote is not reserved · route verified by ESI · risk and station taxes beyond configured sales tax excluded</div></article>';
+  '<div class="trade-run-footer">Estimated opportunity · NPC stations · matched public ESI order quantities · quotes not reserved · stargate route checked · tax and security assumptions apply</div></div></details>';
 }
 async function drawTradeRuns(runs,summary){
  const mount=$('tradeResults'),sort=$('tradeSort').value;
@@ -1238,11 +1241,11 @@ async function scanTrade(){
   await pool(routeWork,4,(_,result,error)=>{
    completed++;if(error)routeFailures++;
    if(result?.estimate)done.push(result);
-   tradeStatus('Routes '+completed+'/'+routeWork.length+' · '+done.length+' profitable verified runs · '+routeFailures+' route failures');
+   tradeStatus('Routes '+completed+'/'+routeWork.length+' · '+done.length+' estimated profitable opportunities · '+routeFailures+' route failures');
   });
   if(run!==tradeLastRun)return;
   tradeScanned=done;
-  tradeStatus('Scanned '+types.length+' goods in '+regions.length+' regions · '+retrieved.requests+' market order requests · '+done.length+' confirmed profitable runs'+(retrieved.failures?' · '+retrieved.failures+' market errors':'')+(missing.length?' · Unknown: '+missing.join(', '):''));
+  tradeStatus('Scanned '+types.length+' goods in '+regions.length+' regions · '+retrieved.requests+' market order requests · '+done.length+' estimated profitable opportunities'+(retrieved.failures?' · '+retrieved.failures+' market errors':'')+(missing.length?' · Unknown: '+missing.join(', '):''));
   await drawTradeRuns(done,{run});
  }catch(error){if(run===tradeLastRun){tradeStatus('Trade scan failed: '+error.message);$('tradeResults').innerHTML='<p class="muted">Could not verify market opportunity. No guessed prices or routes were substituted.</p>';}}
  finally{tradeScanning=false;btn.disabled=false;}
