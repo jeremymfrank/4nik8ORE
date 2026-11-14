@@ -46,7 +46,7 @@ async function fetch(url,options={}){
   if(requested.includes(900004))return {ok:false,status:404,statusText:'Not Found'};
   value=known.names.filter(x=>requested.includes(x.id));
  }
- else if(url.includes('/universe/ids/')){
+ else if(url.includes('/universe/ids')){
   const requested=JSON.parse(options.body||'[]');
   value={inventory_types:known.names.filter(n=>requested.some(s=>s.toLowerCase()===n.name.toLowerCase()))};
  }
