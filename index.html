@@ -126,9 +126,14 @@
         <form id="marketExplorerForm">
           <div class="market-explorer-fields">
             <label class="field"><span>ITEM NAME OR EVE TYPE ID</span><input type="search" id="marketItemSearch" list="marketCatalogSuggest" placeholder="e.g. Tritanium, Veldspar, PLEX, Warp Scrambler II" autocomplete="off" required><datalist id="marketCatalogSuggest"></datalist></label>
-            <label class="field"><span>REGIONS TO COMPARE</span><select id="marketExplorerScope"><option value="all">ALL PUBLIC KNOWN-SPACE REGIONS</option><option value="hubs">FIVE MAJOR HUB REGIONS (FASTER)</option></select></label>
+            <label class="field"><span>REGIONS TO COMPARE</span><select id="marketExplorerScope"><option value="all">ALL PUBLIC KNOWN-SPACE REGIONS</option><option value="hubs">FIVE MAJOR HUB REGIONS (FASTER)</option><option value="local">OPERATING REGION ONLY (FAST)</option></select></label>
           </div>
-          <div class="market-explorer-actions"><button id="marketExplorerGo" type="submit" class="primary">◎ FIND BEST BUY &amp; SELL ORDERS</button></div>
+          <div class="market-explorer-filters">
+            <label class="field"><span>TRADE QUANTITY · UNITS</span><input id="marketQuantity" type="number" min="1" max="1000000000" step="1" value="1" title="Compare unit prices with quantity-aware single-station order fills"></label>
+            <label class="field"><span>ORDER LOCATION FILTER</span><select id="marketAccessFilter"><option value="all">ALL PUBLIC ORDERS · STRUCTURES FLAGGED</option><option value="npc">NPC STATIONS ONLY</option></select></label>
+            <label class="field"><span>MY STATION ID · OPTIONAL</span><input id="marketDeliveryStation" type="number" min="1" step="1" placeholder="For regional buyer range checks" title="Exact station location ID, if known. The operating system above supplies the local system and region."></label>
+          </div>
+          <div class="market-explorer-actions"><button id="marketExplorerGo" type="submit" class="primary">◎ FIND BEST BUY &amp; SELL ORDERS</button><button type="button" id="marketSendToTrade">↔ CALCULATE STARGATE TRADE RUN</button></div>
         </form>
         <div id="marketExplorerStatus" class="market-explorer-status" role="status" aria-live="polite">Prices are requested on demand for one selected market item, respecting ESI market-order rate limits. Public order visibility does not guarantee docking access.</div>
         <div id="marketItemHeadline" class="market-item-headline">Select a market item to explore New Eden.</div>
@@ -138,7 +143,21 @@
         </div>
         <div class="market-explorer-charts" id="marketExplorerCharts" aria-label="Visual market prices compared across regions"></div>
         <div class="market-explorer-table-scroll" id="marketExplorerTable"></div>
-        <p class="trade-note">* Raw regional spread is an indicative unit-price difference, not guaranteed arbitrage profit: orders may be in different stations, have limited quantities/minimums, and incur fees, freight and PvP risk. ESI public region orders exclude private market access. Failed or unavailable regions are counted explicitly; a partial scan cannot establish a global best price.</p>
+        <div id="marketExplorerLocal" class="market-explorer-local" role="status">Local-versus-global comparison will appear once the operating system and regional orders are resolved.</div>
+        <div id="marketQuantitySummary" class="market-quantity-summary">Quantity-adjusted single-station quotations and buyer-range checks appear after a scan.</div>
+        <div class="market-order-audit">
+          <div class="market-audit-title">ORDER-LEVEL AUDIT · ESI PRICES, REMAINING QUANTITIES &amp; RANGES</div>
+          <p class="trade-note">Review every retrieved order, not just each region's highest bid. ESI fields retain their original values; purchase and delivery eligibility remain separate from reported prices. Only public regional orders are available without character-authorized private-structure access.</p>
+          <div class="market-audit-filters">
+            <label class="field"><span>REGION</span><select id="marketAuditRegion"><option value="all">ALL SCANNED REGIONS</option></select></label>
+            <label class="field"><span>SIDE</span><select id="marketAuditSide"><option value="buy">ALL BUY ORDERS</option><option value="sell">ALL SELL ORDERS</option><option value="all">BOTH SIDES</option></select></label>
+            <button type="button" id="marketExportOrders" disabled>EXPORT ALL FETCHED ORDERS · CSV</button>
+          </div>
+          <div id="marketAuditSummary" class="market-explorer-status">Run a price scan to audit each reported ESI order.</div>
+          <div id="marketAuditTable" class="market-explorer-table-scroll"></div>
+          <div class="market-audit-pagination"><button type="button" id="marketAuditPrev" disabled>PREVIOUS 50</button><span id="marketAuditPage">0 / 0</span><button type="button" id="marketAuditNext" disabled>NEXT 50</button></div>
+        </div>
+        <p class="trade-note">* Reported public order prices and ranges are not a guarantee that the pilot can fulfill them. Raw regional spread is an indicative unit-price difference, not guaranteed arbitrage profit: orders may be in different stations, have limited quantities/minimums, and incur fees, freight and PvP risk. ESI public region orders exclude private market access. Failed or unavailable regions are counted explicitly; a partial scan cannot establish a global best price.</p>
       </section>
       <section class="ship-library panel" id="shipLibraryPanel">
         <div class="section-name"><span class="ordinal">07</span> SHIP FITTING LIBRARY <span class="line"></span><span class="small-label">ONE LIBRARY / INDEPENDENT SECTION SHIPS</span></div>
@@ -210,10 +229,11 @@
           <audio id="audioPlayer" preload="none"></audio>
         </div>
       </section>
-      <footer class="bottom"><span>4NIK8 ORE / INDUSTRIAL RECLAMATION</span><span class="version">PREVIEW v0.6.0 · LOCAL WINDOWS</span></footer>
+      <footer class="bottom"><span>4NIK8 ORE / INDUSTRIAL RECLAMATION</span><span class="version">PREVIEW v0.6.1 · LOCAL WINDOWS</span></footer>
     </main>
   </div>
   <script src="logic.js"></script>
+  <script src="market_accuracy.js"></script>
   <script src="market_explorer.js"></script>
   <script src="resource_catalog.js"></script>
   <script src="app.js"></script>
