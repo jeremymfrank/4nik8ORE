@@ -316,7 +316,6 @@ function init(){
  $('marketCatalogSync').addEventListener('click',()=>loadCatalog(true).catch(()=>{}));
  $('marketItemSearch').addEventListener('input',populateSearch);
  $('marketExplorerForm').addEventListener('submit',e=>{e.preventDefault();explore();});
- $('marketExplorerRefresh').addEventListener('click',()=>{loadCatalog(true).catch(()=>{});});
 }
 global.ICMarketExplorer={loadCatalog,catalogItems,resourceItems,compressedFor,catalogState,itemFromSearch,
  regions,summarize,init,explore,familyOf,esi,marketGroupCount:itemCount};
