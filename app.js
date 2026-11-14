@@ -1,10 +1,6 @@
 (function(){
 'use strict';
 const $=id=>document.getElementById(id), L=window.ICLogic;
-const RESOURCES={
- ore:['Pyroxeres','Omber III-Grade','Kernite','Dark Ochre','Gneiss','Crokite'],
- ice:['Clear Icicle','White Glaze','Blue Ice','Glacial Mass']
-};
 const MARKETS={'10000043':'Domain (Amarr)','10000002':'The Forge (Jita)','10000030':'Heimatar (Rens)','10000042':'Metropolis (Hek)','10000032':'Sinq Laison (Dodixie)','10000038':'The Bleak Lands','10000068':'Verge Vendor'};
 const MAJOR_MARKET_REGIONS=[10000043,10000002,10000030,10000042,10000032];
 const FACTORY_JUPILUXE=Object.freeze({id:'factory-jupiluxe-v1',name:'Jupiluxe',url:'https://music.youtube.com/playlist?list=PLfXw8cc_z-vY&si=Dl5vr0dXqf0enefV',playlistId:'PLfXw8cc_z-vY'});
@@ -1163,9 +1159,12 @@ function candidateTradeRuns(types,regions,books,options){
    for(const book of buying)buys.push({...book,region});
   }
   const candidate=[];
+  const marketType=window.ICMarketExplorer.catalogItems().find(t=>t.name.toLowerCase()===item.name.toLowerCase());
+  const isMineral=TRADE_PRESETS.minerals.includes(item.name)||/\bminerals\b/i.test(marketType?.path||'');
+  const family=marketType?window.ICMarketExplorer.familyOf({...marketType,name:marketType.name.replace(/^Compressed\s+/i,'')}):'';
+  const kind=isMineral?'mineral':['ore','moon','ice'].includes(family)?'ore':'general';
+  const haul=freightInputs(kind,'trade');
   for(const source of sells)for(const dest of buys){
-   const kind=TRADE_PRESETS.minerals.includes(item.name)?'mineral':RESOURCES.ore.concat(RESOURCES.ice).some(x=>item.name===x||item.name==='Compressed '+x)?'ore':'general';
-   const haul=freightInputs(kind,'trade');
    const quote=L.tradeQuote(source,dest,{...options,...haul,unitVolume:item.volume});
    if(quote)candidate.push({item,source,dest,quote,haul});
   }
