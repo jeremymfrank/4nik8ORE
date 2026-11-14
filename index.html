@@ -24,8 +24,15 @@
             <label class="field market-field" for="hubSelect"><span>MARKET COVERAGE</span><select id="hubSelect"><option value="all">AUTO · ALL MAJOR HUB REGIONS + LOCAL</option><option value="local">OPERATING REGION ONLY</option></select></label>
           </div>
           <div class="config-row">
-            <div class="segmented" role="group" aria-label="Resource group"><button type="button" class="segment active" data-resource="both" aria-pressed="true">ORE + ICE</button><button type="button" class="segment" data-resource="ore" aria-pressed="false">ORE</button><button type="button" class="segment" data-resource="ice" aria-pressed="false">ICE</button></div>
+            <div class="segmented" role="group" aria-label="Resource group"><button type="button" class="segment active" data-resource="both" aria-pressed="true">ORE + MOON + ICE</button><button type="button" class="segment" data-resource="ore" aria-pressed="false">ASTEROID + MOON</button><button type="button" class="segment" data-resource="ice" aria-pressed="false">ICE</button><button type="button" class="segment" data-resource="moon" aria-pressed="false">MOON ORE</button><button type="button" class="segment" data-resource="gas" aria-pressed="false">GAS</button></div>
             <label class="field load-field" for="cargoVolume"><span>LOAD TO PRICE · m³</span><input type="number" id="cargoVolume" min="1" max="10000000" step="1" value="31625"></label>
+          </div>
+          <div class="resource-picker">
+            <div class="resource-picker-heading">EVE RESOURCE CATALOG · ALL TYPES FROM ESI</div>
+            <label class="field"><span>FIND ORE, MOON ORE, ICE OR GAS (NAME / VARIANT)</span><input type="search" id="resourceFilter" placeholder="e.g. Mercoxit, Glare Crust, Cobaltite" autocomplete="off"></label>
+            <select id="resourcePick" multiple size="5" aria-label="Resource types to price. Hold Ctrl to select multiple"><option value="">Load the full ESI market catalog to select mineable resources</option></select>
+            <div class="resource-picker-buttons"><button type="button" id="resourceCatalogLoad">LOAD / UPDATE RESOURCE CATALOG</button><button type="button" id="resourcePickMatches">SELECT MATCHING (MAX 12)</button><button type="button" id="resourcePickClear">CLEAR SELECTION</button></div>
+            <div id="resourceCatalogStatus" class="resource-catalog-status" role="status">Select up to 12 resource variants per price scan. The full market item catalog is shared with the Market Explorer below.</div>
           </div>
           <div class="scan-actions"><button id="scanButton" class="primary" type="submit"><span aria-hidden="true">◎</span> SCAN MARKETS</button><button id="refreshButton" type="button" class="ghost" title="Refresh cached market data" disabled>↻ REFRESH</button></div>
         </form>
@@ -112,8 +119,29 @@
         <div id="tradeResults" class="trade-results"><p class="muted">No live trade opportunities scanned. Enter a purchase budget and scan the goods you want to haul.</p></div>
         <p class="trade-note">Estimates only. Public orders can change before arrival. NPC stations only; buyer ranges beyond the order station, PvP risk, and price movement are not guaranteed. Buying at existing sell orders and selling to existing buy orders do not require posting new orders.</p>
       </section>
+      <section class="market-explorer panel" id="marketExplorerPanel">
+        <div class="section-name"><span class="ordinal">06</span> NEW EDEN MARKET EXPLORER <span class="line"></span><span class="small-label">ALL MARKET ITEMS / EVERY PUBLIC REGION</span></div>
+        <p class="trade-intro">Search any EVE market-listed item, not just ore. The catalog comes from all ESI market groups. Compare the cheapest listed seller (where to buy) and the highest public buy order (where to sell) across regions.</p>
+        <div class="market-catalog-actions"><button type="button" id="marketCatalogSync">SYNC ALL MARKET ITEMS FROM ESI</button><span id="marketCatalogSummary" role="status">Full market item index not yet loaded. Search an exact item name now, or sync for suggestions.</span></div>
+        <form id="marketExplorerForm">
+          <div class="market-explorer-fields">
+            <label class="field"><span>ITEM NAME OR EVE TYPE ID</span><input type="search" id="marketItemSearch" list="marketCatalogSuggest" placeholder="e.g. Tritanium, Veldspar, PLEX, Warp Scrambler II" autocomplete="off" required><datalist id="marketCatalogSuggest"></datalist></label>
+            <label class="field"><span>REGIONS TO COMPARE</span><select id="marketExplorerScope"><option value="all">ALL PUBLIC KNOWN-SPACE REGIONS</option><option value="hubs">FIVE MAJOR HUB REGIONS (FASTER)</option></select></label>
+          </div>
+          <div class="market-explorer-actions"><button id="marketExplorerGo" type="submit" class="primary">◎ FIND BEST BUY &amp; SELL ORDERS</button></div>
+        </form>
+        <div id="marketExplorerStatus" class="market-explorer-status" role="status" aria-live="polite">Prices are requested on demand for one selected market item, respecting ESI market-order rate limits. Public order visibility does not guarantee docking access.</div>
+        <div id="marketItemHeadline" class="market-item-headline">Select a market item to explore New Eden.</div>
+        <div class="market-explorer-kpis">
+          <div class="market-explorer-kpi"><small>LOWEST ASK · BUY FROM SELLER</small><strong id="marketBestBuy">—</strong><span id="marketBestBuyLocation">No verified orders</span></div>
+          <div class="market-explorer-kpi"><small>HIGHEST BID · SELL TO BUYER</small><strong id="marketBestSell">—</strong><span id="marketBestSellLocation">No verified orders</span></div>
+        </div>
+        <div class="market-explorer-charts" id="marketExplorerCharts" aria-label="Visual market prices compared across regions"></div>
+        <div class="market-explorer-table-scroll" id="marketExplorerTable"></div>
+        <p class="trade-note">* Raw regional spread is an indicative unit-price difference, not guaranteed arbitrage profit: orders may be in different stations, have limited quantities/minimums, and incur fees, freight and PvP risk. ESI public region orders exclude private market access. Failed or unavailable regions are counted explicitly; a partial scan cannot establish a global best price.</p>
+      </section>
       <section class="ship-library panel" id="shipLibraryPanel">
-        <div class="section-name"><span class="ordinal">06</span> SHIP FITTING LIBRARY <span class="line"></span><span class="small-label">ONE LIBRARY / INDEPENDENT SECTION SHIPS</span></div>
+        <div class="section-name"><span class="ordinal">07</span> SHIP FITTING LIBRARY <span class="line"></span><span class="small-label">ONE LIBRARY / INDEPENDENT SECTION SHIPS</span></div>
         <p class="ship-note">Select a saved fit in each section above. Public ESI loads base hull attributes; recognized EFT modules and rigs adjust ordinary cargo, align and warp performance. Enter your actual fitted values to account for skills, implants, hull bonuses, or unsupported modules.</p>
         <div class="ship-catalog" aria-label="Search official EVE ship hull catalog">
           <div class="ship-catalog-heading">EVE SHIP CATALOG · LIVE CCP ESI</div>
@@ -182,10 +210,11 @@
           <audio id="audioPlayer" preload="none"></audio>
         </div>
       </section>
-      <footer class="bottom"><span>4NIK8 ORE / INDUSTRIAL RECLAMATION</span><span class="version">PREVIEW v0.5.2 · LOCAL WINDOWS</span></footer>
+      <footer class="bottom"><span>4NIK8 ORE / INDUSTRIAL RECLAMATION</span><span class="version">PREVIEW v0.6.0 · LOCAL WINDOWS</span></footer>
     </main>
   </div>
   <script src="logic.js"></script>
+  <script src="market_explorer.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
