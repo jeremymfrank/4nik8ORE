@@ -555,3 +555,19 @@ input[type=search]{background:#101415;color:#f1e5cb;border:1px solid #57605b;bor
  .ship-catalog{padding:11px}
  .ship-quick-stats{padding:10px}
 }
+
+
+/* v0.6.2 · freight results are the destination list, not a second large profit banner */
+.freight-selected{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px 16px;padding:10px 12px;margin-bottom:9px;background:#162225;border-left:3px solid var(--amber);border-radius:4px}
+.freight-selected>span{font-size:13px;line-height:1.5}
+.freight-selected b{font-size:15px;color:#ebc88a}
+.freight-selected small{color:var(--muted);font-size:10px;line-height:1.5}
+.freight-cost-caption{font-size:10px;padding:8px 0 10px}
+.freight-cost-breakdown,.freight-terms{border:1px solid var(--edge);border-radius:5px;margin:10px 0;background:#1b2224}
+.freight-cost-breakdown>summary,.freight-terms>summary{cursor:pointer;font-size:11px;font-weight:800;padding:10px 12px;color:#dcc29a;list-style:none}
+.freight-cost-breakdown>summary::before,.freight-terms>summary::before{content:"▸";margin-right:8px}
+.freight-cost-breakdown[open]>summary::before,.freight-terms[open]>summary::before{content:"▾"}
+.freight-cost-breakdown .freight-costs{border:0;margin:0;padding:8px 12px 12px}
+.freight-terms .freight-disclaimer{margin:0;padding:10px 12px}
+.freight-destinations{max-height:min(62vh,560px)}
+@media(max-width:520px){.freight-selected{flex-direction:column;align-items:flex-start}.freight-destinations{max-height:66vh}}
