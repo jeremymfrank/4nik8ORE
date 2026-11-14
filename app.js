@@ -10,7 +10,7 @@ const MAJOR_MARKET_REGIONS=[10000043,10000002,10000030,10000042,10000032];
 const FACTORY_JUPILUXE=Object.freeze({id:'factory-jupiluxe-v1',name:'Jupiluxe',url:'https://music.youtube.com/playlist?list=PLfXw8cc_z-vY&si=Dl5vr0dXqf0enefV',playlistId:'PLfXw8cc_z-vY'});
 const CACHE_TTL=300000; const memCache=new Map();
 const state={resource:'both',system:null,region:null,hub:'all',results:[],selected:null,lastRun:0,inProgress:false,runId:0,coverage:[],failed:0,routeToken:0,routeEstimates:new Map()};
-const ua='4NIK8-Industrial-Command-Preview/0.5.2';
+const ua='4NIK8-Industrial-Command-Preview/0.6.0';
 
 const FACTORY_SHIPS=[
  {id:'retriever',name:'Retriever',hull:'Retriever'},
@@ -367,21 +367,7 @@ async function findSystem(name,force){
  return {id:found.id,name:sys.name||name,security:sys.security_status,regionId:constellation.region_id,regionName:region.name};
 }
 async function loadResources(resource,force){
- const names=resource==='both'?[...RESOURCES.ore,...RESOURCES.ice]:RESOURCES[resource], all=names.concat(names.map(n=>'Compressed '+n));
- const found=await resolveNames(all,force);
- const types=Object.fromEntries((found.inventory_types||[]).map(t=>[t.name,t.id]));
- const map=[];
- for(const name of names){
-  const id=types[name];if(!id){map.push({name,error:'Item ID not resolved by ESI'});continue;}
-  try{
-   const detail=await request('/universe/types/'+id+'/',{},86400000,force);
-   const compressedId=types['Compressed '+name]||null;
-   let compressedVolume=null;
-   if(compressedId){try{const c=await request('/universe/types/'+compressedId+'/',{},86400000,force);compressedVolume=Number(c.volume)||null;}catch(_){/* Leave compressed quotes uncosted when SDE data is unavailable. */}}
-   map.push({name,id,compressedId,volume:detail.volume,compressedVolume});
-  }catch(e){map.push({name,error:e.message});}
- }
- return map;
+ return window.ICResourceBrowser.loadResources(resource,force);
 }
 async function pool(work,limit,onComplete){
  let cursor=0;const workers=Array.from({length:Math.min(limit,work.length)},async()=>{
@@ -465,9 +451,9 @@ function restoreMiningCalibration(){
  miningObserved.ore=Number(saved?.observedOreM3Hour)>0?Number(saved.observedOreM3Hour):null;
  miningObserved.ice=Number(saved?.observedIceM3Hour)>0?Number(saved.observedIceM3Hour):null;
 }
-function miningKind(item){return RESOURCES.ice.includes(item.name)?'ice':'ore';}
+function miningKind(item){return item?.kind==='ice'?'ice':item?.kind==='gas'?'gas':'ore';}
 function miningMetric(item,v){
- if(!v||!v.estimate)return null;
+ if(!v||!v.estimate||miningKind(item)==='gas')return null;
  const kind=miningKind(item),c=freightInputs(kind,'ore');
  const e=L.freightEstimate(v.quote,v.estimate.jumps,v.physicalUnitM3,item.volume,c);
  return L.miningPerformance(item,{...v,estimate:e},miningSnapshot(),c,kind);
@@ -482,7 +468,7 @@ function bestHourlyBuyer(item){
 }
 function oreProfitEstimate(item,variant){
  if(!variant?.estimate)return null;
- return L.freightEstimate(variant.quote,variant.estimate.jumps,variant.physicalUnitM3,item.volume,freightInputs(miningKind(item),'ore'));
+ return L.freightEstimate(variant.quote,variant.estimate.jumps,variant.physicalUnitM3,item.volume,freightInputs(miningKind(item)==='gas'?'general':miningKind(item),'ore'));
 }
 function bestOreBuyer(item){
  if(!Array.isArray(item?.variants))return item?.winner||null;
@@ -521,6 +507,7 @@ function renderMiningPanel(){
  const out=$('miningMetrics'),item=state.results.find(x=>x.name===state.selected)||visibleOpportunities().find(x=>x.winner);
  if(!item?.winner){out.innerHTML='<p class="muted">Run a live market scan and select a resource. Mining performance is not priced from invented market values.</p>';return;}
  const kind=miningKind(item),best=bestHourlyBuyer(item)||item.winner,m=miningMetric(item,best);
+ if(kind==='gas'){out.innerHTML='<p class="muted"><b>'+L.escape(item.name)+'</b> is gas. Public buyer quotes are displayed, but ore and ice yields do not apply to gas harvesting. No gas ISK/hour estimate is claimed.</p>';return;}
  const profile=miningSnapshot(),rate=L.miningRate(profile,kind,item.volume/item.units);
  if(!rate){out.innerHTML='<div class="rate-heading"><b>'+L.escape(item.name)+'</b><span>'+kind.toUpperCase()+' · NOT CALIBRATED</span></div><p class="muted">Enter your fitted '+(kind==='ore'?'strip miner m³/cycle and cycle seconds':'ice harvester units/cycle and cycle seconds')+', or time a real mining session. No imaginary ISK/hour is displayed.</p>';return;}
  if(!m){out.innerHTML='<div class="rate-heading"><b>'+L.escape(item.name)+'</b><span>'+kind.toUpperCase()+' · '+rate.source.toUpperCase()+'</span></div><p class="muted">Production: <b>'+L.formatIsk(rate.m3Hour,1)+' m³/h</b>. All-in earnings require a full-load public buyer order and verified stargate route; wormhole exits and private structure docking are not verified.</p>';return;}
@@ -1089,6 +1076,7 @@ function radioInit(){
 }
 Array.from(document.querySelectorAll('[data-resource]')).forEach(b=>b.addEventListener('click',()=>{
  state.resource=b.dataset.resource;
+  window.ICResourceBrowser.setMode(state.resource);
  settingsManager.schedule();
  document.querySelectorAll('[data-resource]').forEach(x=>{const active=x===b;x.classList.toggle('active',active);x.setAttribute('aria-pressed',String(active));});
 }));
@@ -1327,7 +1315,7 @@ const settingsManager=(()=>{
   if(typeof scan.system==='string'&&scan.system)$('systemInput').value=scan.system;
   if(typeof scan.hub==='string'&&[...$('hubSelect').options].some(x=>x.value===scan.hub))$('hubSelect').value=scan.hub;
   if(Number.isFinite(+scan.cargo)&&+scan.cargo>0)$('cargoVolume').value=+scan.cargo;
-   if(['ore','ice','both'].includes(scan.resource)){
+   if(['ore','ice','both','moon','gas'].includes(scan.resource)){
    state.resource=scan.resource;
    document.querySelectorAll('[data-resource]').forEach(b=>{const yes=b.dataset.resource===scan.resource;b.classList.toggle('active',yes);b.setAttribute('aria-pressed',String(yes));});
   }
@@ -1405,5 +1393,5 @@ function liveryInit(){
  picker.addEventListener('change',()=>apply(picker.value));
  apply(chosen);
 }
-settingsManager.load().finally(()=>{shipInit();liveryInit();radioInit();miningInit();});
+settingsManager.load().finally(()=>{shipInit();liveryInit();radioInit();miningInit();window.ICMarketExplorer.init();window.ICResourceBrowser.init(state.resource);});
 })();
