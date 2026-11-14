@@ -119,13 +119,25 @@ try {
                   $cleanChannels += [ordered]@{id=$id;name=$name;playlistId=$list;url=$savedUrl}
                }
                $resource = [string]$doc.scanner.resource
-               if (@('ore','ice','both') -notcontains $resource) { throw 'Invalid resource' }
+               if (@('ore','ice','both','moon','gas') -notcontains $resource) { throw 'Invalid resource' }
                $hub = [string]$doc.scanner.hub
                if ($hub -ne 'all' -and $hub -ne 'local' -and $hub -notmatch '^\d{8}$') { throw 'Invalid hub' }
                $sys = [string]$doc.scanner.system
                if ($sys.Length -gt 100) { throw 'Invalid system' }
                $cargo = [int]$doc.scanner.cargo
                if ($cargo -lt 1 -or $cargo -gt 10000000) { throw 'Invalid cargo volume' }
+               $resourceIds = @()
+               if ($null -ne $doc.scanner.resourceIds) {
+                  $ids = @($doc.scanner.resourceIds)
+                  if ($ids.Count -gt 12) { throw 'Too many resource selections' }
+                  foreach ($id in $ids) {
+                     $n=0
+                     if (-not [int]::TryParse([string]$id,[ref]$n) -or $n -le 0 -or $n -gt 1000000000) {
+                        throw 'Invalid selected resource ID'
+                     }
+                     if ($resourceIds -notcontains $n) { $resourceIds += $n }
+                  }
+               }
                $selection = [string]$doc.radio.selectedChannelId
                if ($selection.Length -gt 90) { $selection = '' }
                # Extra freight fields are optional for backwards-compatible v0.3/v0.4 settings.
@@ -305,7 +317,7 @@ try {
                $clean = [ordered]@{
                   schemaVersion=1; livery=[string]$doc.livery;
                   radio=[ordered]@{volume=$volume;shuffle=$shuffle;channels=$cleanChannels;selectedChannelId=$selection};
-                  scanner=[ordered]@{system=$sys;hub=$hub;resource=$resource;cargo=$cargo};haul=$haul;mining=$mining;trade=$trade;ships=$ships
+                  scanner=[ordered]@{system=$sys;hub=$hub;resource=$resource;cargo=$cargo;resourceIds=$resourceIds};haul=$haul;mining=$mining;trade=$trade;ships=$ships
                }
                $json = ConvertTo-Json -InputObject $clean -Depth 12 -Compress
                if (-not (Test-Path -LiteralPath $dataRoot)) { [System.IO.Directory]::CreateDirectory($dataRoot) | Out-Null }
