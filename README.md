@@ -1,4 +1,4 @@
-# 4NIK8 ORE — Industrial Command (Preview v0.5.0)
+# 4NIK8 ORE — Industrial Command (Preview v0.5.1)
 
 **Local-only, single-user EVE Online mining-market prototype**, optimized for a **1080×1920 portrait side monitor**. Features the **CB ContraBand Radio** with saved YouTube Music / YouTube playlist channels.
 
@@ -97,7 +97,7 @@ EVE Online and YouTube are trademarks of their respective owners. This is an ind
 
 ## v0.4.3 - Mining Performance (calibrated ISK/hour)
 
-The Mining Performance panel, underneath Freight Profit Analyzer, models **two separate production rates**: ore strip mining and ice harvesting. Its factory ship profile is **High on Supply / Retriever** with two mining modules; the yield and cycle time fields intentionally begin **blank** because actual rates depend on the fitted modules, trained skills, current boosts, implants, critical successes and resource type. ESI does not report live mining laser cycles or live cargo quantities.
+The Mining Performance panel, underneath Freight Profit Analyzer, models **two separate production rates**: ore strip mining and ice harvesting. Its factory ship profile is a generic **Retriever** with two mining modules; the yield and cycle time fields intentionally begin **blank** because actual rates depend on the fitted modules, trained skills, current boosts, implants, critical successes and resource type. ESI does not report live mining laser cycles or live cargo quantities.
 
 To calibrate either mode, enter the module's **effective m3/cycle and seconds per cycle** as shown in EVE, or press **START TIMED SESSION**, mine normally, and enter the actual number of m3 you produced before pressing **END & CALIBRATE**. Observed rates override module estimates, including the time your lasers were idle. The timer measures real wall-clock time; it stays running across app restarts and must be stopped with a mined volume. Ice mode uses actual ice units per cycle and raw item volume from ESI instead of incorrectly applying the ore yield.
 
@@ -150,3 +150,14 @@ For each candidate with positive after-tax margin, the scanner verifies the rout
 **Verification:** Run **node tests/ship.test.js** for deterministic EFT parsing, separated holds, exact-capacity restrictions, fitting multipliers, warp duration, loaded trips, legacy fallback and mining all-in ISK/hour. The ship unit checks and JS syntax checks pass. Existing browser/mock-ESI tests should be run on the Windows PC before calling the release fully integrated.
 
 **Known approximations:** This release does not yet derive actual gate-to-gate/station-to-gate distances from universe spatial data. Pilot skills, implants, special hull bonuses, modules not in the whitelist, server ticks, undock/dock time, and navigation hazards may affect actual rates. Enter the exact fitted stats or calibrate real runs. A live Windows/ESI end-to-end test and all browser viewport tests are pending.
+
+
+## v0.5.1: Complete ship catalog, generic defaults
+
+The initial eight hulls were never a complete list of EVE ships. **06 SHIP FITTING LIBRARY** now offers **LOAD / REFRESH SHIP CATALOG**, powered by CCP's public ship category (GET /universe/categories/6/), its ship groups (GET /universe/groups/{id}/), and type-name lookup (POST /universe/names/). After loading, search by hull or ship class, choose **ADD SELECTED HULL**, or choose any catalog hull directly from a section's ship selector. A newly selected hull becomes a locally saved profile using its official hull name and its publicly available ESI base stats. The catalog is cached in the browser for seven days; users may also enter a specific hull name manually without fetching the complete list. If ESI cannot load the full catalog, the UI reports the partial result or retains the last complete cache rather than claiming complete coverage.
+
+**Neutral defaults:** All factory ship-profile names now equal their hull names (including **Retriever**, **Tayra**, etc.). The personal **High on Supply** name has been removed from defaults, placeholders, and default mining rates. Old factory Retriever records using the exact previous factory name are renamed during settings migration; independently named, user-created profiles and fitted settings are preserved. Player-specific ship nicknames remain optional and local to the player's saved fitting.
+
+The ship library holds up to 128 locally saved fits, while the searchable EVE ship catalog is kept separately; having hundreds of catalog hulls does not fill the saved-profile limit. Fitted skill/implant stats still require entered overrides when ESI has only public hull data. Some unpublished NPC/developer hull types may be listed by the public ship category but will be rejected when selected if their type is not published; the catalog is not a claim that every ship is flyable.
+
+Deterministic ship math tests remain available through node tests/ship.test.js; full live ESI catalog loading and the Windows UI still require on-machine testing.
