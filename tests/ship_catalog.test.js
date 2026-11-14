@@ -7,7 +7,7 @@ const root=path.join(__dirname,'..');
 require('../logic.js');
 const logic=globalThis.ICLogic;
 const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
-const anchor='settingsManager.load().finally(()=>{shipInit();liveryInit();radioInit();miningInit();});';
+const anchor='settingsManager.load().finally(()=>{shipInit();liveryInit();radioInit();miningInit();window.ICMarketExplorer.init();window.ICResourceBrowser.init(state.resource);});';
 assert(app.includes(anchor),'App startup hook changed; update this regression test');
 const testApp=app.replace(anchor,
  'window.__test={shipCatalogInit,shipInit,fetchShipCatalog,addShipFromCatalog,catalogCsv,getLibrary:()=>shipLibrary,getCatalog:()=>shipCatalog,getSelections:()=>selectedShips};');
