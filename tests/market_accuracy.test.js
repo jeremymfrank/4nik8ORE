@@ -17,7 +17,7 @@ for(const range of A.ORDER_RANGES){
 const bids=A.validateBook([order(11),order(12,{price:2050000,min_volume:10,volume_remain:25}),
  order(13,{price:1900000,min_volume:1,volume_remain:100})],24305).map(x=>({...x,regionId:10000038}));
 assert.equal(A.unitQuote(bids,'bid').price,2084000.03);
-assert.equal(A.volumeFill(bids,20,'bid').filled,15); // second 5 units cannot meet min 10
+assert.equal(A.volumeFill(bids,20,'bid').filled,20); // second 5 units cannot meet min 10, so third order fills the rest
 assert.equal(A.volumeFill(bids,20,'bid').full,true); // third order finishes 5 units
 assert.equal(A.volumeFill(bids,20,'bid').total,15*2084000.03+5*1900000);
 assert.equal(A.eligibility(bids[0],{regionId:10000038,systemId:30000055,locationId:60000099}),'yes');
