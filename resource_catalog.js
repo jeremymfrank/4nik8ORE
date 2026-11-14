@@ -3,7 +3,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const KEY='4nik8.resource.selection.v1', MAX_SELECTED=12;
-let selected=new Set(),mode='both';
+let selected=new Set(),mode='both',firstLaunch=false;
 function market(){return global.ICMarketExplorer;}
 function family(item){return market().familyOf(item);}
 function filtered(){
@@ -27,9 +27,20 @@ function render(){
   inCategory+' selected in this class · '+found.length+' matches'+(found.length>200?' (first 200 shown; refine search)':'')+
   ' · Scan 1–12 selected variants (Ctrl-click to select multiple).';
 }
+function seedDefaultSelection(){
+ if(!firstLaunch||!market().catalogState().complete)return;
+ firstLaunch=false;
+ const defaults=['Pyroxeres','Kernite','Dark Ochre','Omber III-Grade','Gneiss','Crokite',
+  'Clear Icicle','White Glaze','Blue Ice','Glacial Mass'];
+ const lookup=market().resourceItems('both');
+ selected=new Set(defaults.map(name=>lookup.find(x=>x.name===name)?.id).filter(Boolean).slice(0,MAX_SELECTED));
+ save();
+}
+function onCatalogLoaded(){seedDefaultSelection();render();}
 function setMode(value){mode=value;render();}
 function init(currentMode='both'){
  mode=currentMode;
+ firstLaunch=localStorage.getItem(KEY)===null;
  try{
   const raw=JSON.parse(localStorage.getItem(KEY)||'[]');
   if(Array.isArray(raw)&&raw.length<=MAX_SELECTED)selected=new Set(raw.filter(x=>Number.isInteger(x)&&x>0));
@@ -58,8 +69,8 @@ function init(currentMode='both'){
   selected=new Set(items.map(x=>x.id));save();render();
  });
  $('resourcePickClear').addEventListener('click',()=>{selected.clear();save();render();});
- global.addEventListener('ic-market-catalog-updated',render);
- render();
+ global.addEventListener('ic-market-catalog-updated',onCatalogLoaded);
+ seedDefaultSelection();render();
 }
 async function loadResources(resource,force=false){
  const M=market();
