@@ -48,7 +48,7 @@ async function fetch(url,options={}){
  else throw Error('Unexpected mocked ESI call '+url);
  return {ok:true,json:async()=>value};
 }
-const win={ICLogic:logic};
+const win={ICLogic:logic,addEventListener(){}};
 new Function('window','document','fetch','localStorage','setTimeout','clearTimeout','AbortController',testApp)(
  win,document,fetch,localStorage,(fn,ms)=>{if(ms<500)fn();return 1;},()=>{},
  class {abort(){}get signal(){return {};}}
