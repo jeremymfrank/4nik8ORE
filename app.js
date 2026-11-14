@@ -10,7 +10,7 @@ const MAJOR_MARKET_REGIONS=[10000043,10000002,10000030,10000042,10000032];
 const FACTORY_JUPILUXE=Object.freeze({id:'factory-jupiluxe-v1',name:'Jupiluxe',url:'https://music.youtube.com/playlist?list=PLfXw8cc_z-vY&si=Dl5vr0dXqf0enefV',playlistId:'PLfXw8cc_z-vY'});
 const CACHE_TTL=300000; const memCache=new Map();
 const state={resource:'both',system:null,region:null,hub:'all',results:[],selected:null,lastRun:0,inProgress:false,runId:0,coverage:[],failed:0,routeToken:0,routeEstimates:new Map()};
-const ua='4NIK8-Industrial-Command-Preview/0.5.1';
+const ua='4NIK8-Industrial-Command-Preview/0.5.2';
 
 const FACTORY_SHIPS=[
  {id:'retriever',name:'Retriever',hull:'Retriever'},
@@ -35,22 +35,27 @@ function shipOptions(role,kind){
 
 const SHIP_CATALOG_KEY='4nik8.ship.catalog.v1';
 const SHIP_CATALOG_AGE=7*86400000;
-let shipCatalog=[],catalogLoading=false,catalogComplete=false;
+let shipCatalog=[],catalogLoading=false,catalogComplete=false,catalogCacheAt=0,catalogGroupCount=0,catalogMissingNames=0;
 function validCatalogEntry(x){
  return Number.isInteger(+x?.id)&&+x.id>0&&+x.id<1e9&&
   typeof x.name==='string'&&x.name.length>0&&x.name.length<=100&&
   typeof x.group==='string'&&x.group.length>0&&x.group.length<=100;
 }
+// Keep the last successful result available even after it expires: offline users
+// can still choose ships, while a background ESI refresh attempts to update them.
 function loadCachedShipCatalog(){
  try{
   const cache=JSON.parse(localStorage.getItem(SHIP_CATALOG_KEY)||'null');
-  if(cache?.version!==1||!(Date.now()-cache.at>=0&&Date.now()-cache.at<SHIP_CATALOG_AGE)||
+  if(![1,2].includes(cache?.version)||!Number.isFinite(+cache.at)||
    !Array.isArray(cache.ships)||cache.ships.length<10||cache.ships.length>10000||
-   !cache.ships.every(validCatalogEntry))return;
-  shipCatalog=cache.ships;catalogComplete=true;
- }catch(_){}
+   !cache.ships.every(validCatalogEntry))return false;
+  shipCatalog=cache.ships;
+  catalogComplete=true;catalogCacheAt=+cache.at;
+  catalogGroupCount=+cache.groups||0;catalogMissingNames=+cache.missingNames||0;
+  return Date.now()-catalogCacheAt>=0&&Date.now()-catalogCacheAt<SHIP_CATALOG_AGE;
+ }catch(_){return false;}
 }
-function catalogStatus(text){$('shipCatalogStatus').textContent=text;}
+function catalogStatus(value){$('shipCatalogStatus').textContent=value;}
 function catalogMatches(){
  const query=$('shipCatalogSearch').value.trim().toLowerCase();
  return shipCatalog.filter(s=>!query||s.name.toLowerCase().includes(query)||s.group.toLowerCase().includes(query));
@@ -61,59 +66,108 @@ function refreshCatalogMatches(){
  box.disabled=!matches.length;
  if(matches.some(s=>String(s.id)===current))box.value=current;
  $('shipCatalogAdd').disabled=!matches.length||catalogLoading;
+ $('shipCatalogExport').disabled=!shipCatalog.length||catalogLoading;
  const suffix=matches.length>80?' · first 80 shown (refine search)':'';
  if(shipCatalog.length)catalogStatus(shipCatalog.length.toLocaleString()+
-   ' ship-category hulls indexed'+(catalogComplete?' · cached locally':' · partial catalog; refresh to complete')+
-   ' · '+matches.length+' matching'+suffix);
+  ' hull IDs indexed'+(catalogGroupCount?' · '+catalogGroupCount+' ship groups':'')+
+  (catalogMissingNames?' · '+catalogMissingNames+' names unavailable':'')+
+  (catalogComplete?(Date.now()-catalogCacheAt>SHIP_CATALOG_AGE?' · stale offline copy':' · cached locally'):' · partial catalog')+
+  ' · '+matches.length+' matching'+suffix);
+}
+// ESI may reject a large name batch containing a single deleted/unpublished ID.
+// Divide only on an actual 400/404; never recursively retry a network outage.
+async function resolveShipNameBatch(ids){
+ try{
+  const names=await request('/universe/names/',{method:'POST',body:JSON.stringify(ids)},86400000);
+  if(!Array.isArray(names))throw Error('ESI returned an invalid ship-name payload');
+  return names;
+ }catch(error){
+  if(!/\bESI (400|404)\b/.test(String(error.message)))throw error;
+  if(ids.length===1)return [];
+  const middle=Math.floor(ids.length/2);
+  const [first,second]=await Promise.all([
+   resolveShipNameBatch(ids.slice(0,middle)),
+   resolveShipNameBatch(ids.slice(middle))
+  ]);
+  return first.concat(second);
+ }
+}
+function catalogCsv(){
+ const quote=s=>'"'+String(s??'').replace(/"/g,'""')+'"';
+ const rows=[['type_id','hull_name','ship_group'],...shipCatalog.map(s=>[s.id,s.name,s.group])];
+ return '\uFEFF'+rows.map(row=>row.map(quote).join(',')).join('\r\n')+'\r\n';
+}
+function exportShipCatalog(){
+ if(!shipCatalog.length)return;
+ const blob=new Blob([catalogCsv()],{type:'text/csv;charset=utf-8'});
+ const address=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=address;a.download='4nik8-eve-ship-catalog-'+new Date().toISOString().slice(0,10)+'.csv';
+ document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(address),1200);
+ catalogStatus('Exported '+shipCatalog.length.toLocaleString()+' ship-category IDs to CSV; names unavailable for '+
+  catalogMissingNames+' IDs. All entries came from the last retrieved ESI category data.');
 }
 async function fetchShipCatalog(){
  if(catalogLoading)return;
- catalogLoading=true;$('shipCatalogLoad').disabled=true;$('shipCatalogAdd').disabled=true;
+ catalogLoading=true;
+ $('shipCatalogLoad').disabled=true;$('shipCatalogAdd').disabled=true;
+ $('shipCatalogExport').disabled=true;
  let failures=0,finalMessage='';
  try{
-  catalogStatus('Loading EVE ship group list…');
+  catalogStatus('Loading the complete EVE ship-category group list from CCP ESI…');
   const category=await request('/universe/categories/6/',{},86400000,true);
-  if(!Array.isArray(category?.groups)||category.groups.length<1||category.groups.length>500)throw Error('Unexpected ship category response');
+  if(category?.category_id!==6||!Array.isArray(category.groups)||
+   category.groups.length<1||category.groups.length>500)throw Error('Unexpected ESI Ship category response');
   const groups=[];
   let done=0;
   await pool(category.groups.map(id=>async()=>request('/universe/groups/'+id+'/',{},86400000)),5,(_,result,error)=>{
-   done++;if(error)failures++;
-   else if(result?.category_id===6&&result.published!==false&&Array.isArray(result.types)){
-    groups.push(result);
-   }
-   catalogStatus('Indexing ship groups '+done+'/'+category.groups.length+(failures?' · '+failures+' failed':''));
+   done++;if(error||!result||result.category_id!==6||!Array.isArray(result.types))failures++;
+   else if(result.published!==false)groups.push(result);
+   catalogStatus('Loading ship groups '+done+'/'+category.groups.length+(failures?' · '+failures+' failed':''));
   });
   const ids=new Map();
-  for(const group of groups){
-   for(const id of group.types){
-    if(Number.isInteger(+id)&&+id>0&&!ids.has(+id))ids.set(+id,group.name||'Ship');
-   }
-  }
+  for(const group of groups)for(const id of group.types)
+   if(Number.isInteger(+id)&&+id>0&&!ids.has(+id))ids.set(+id,group.name||'Ship');
   const numbers=[...ids.keys()];
-  if(!numbers.length)throw Error('No ship type IDs returned by EVE');
+  if(!numbers.length)throw Error('No ship types returned by ESI');
   const chunks=[];for(let i=0;i<numbers.length;i+=400)chunks.push(numbers.slice(i,i+400));
-  const matched=[];
+  const matched=new Map();
   done=0;
-  await pool(chunks.map(group=>async()=>request('/universe/names/',{method:'POST',body:JSON.stringify(group)},86400000)),3,(_,result,error)=>{
-   done++;if(error||!Array.isArray(result))failures++;
-   else for(const row of result)if(ids.has(+row.id)&&typeof row.name==='string'&&row.name.trim()&&row.name.length<=100)
-    matched.push({id:+row.id,name:row.name.trim(),group:String(ids.get(+row.id)).slice(0,100)});
-   catalogStatus('Resolving EVE ship names '+done+'/'+chunks.length+(failures?' · '+failures+' failed':''));
+  await pool(chunks.map(group=>async()=>resolveShipNameBatch(group)),3,(_,result,error)=>{
+   done++;
+   if(error||!Array.isArray(result))failures++;
+   else for(const row of result){
+    if(!ids.has(+row.id)||typeof row.name!=='string'||!row.name.trim()||row.name.length>100)continue;
+    matched.set(+row.id,{id:+row.id,name:row.name.trim(),group:String(ids.get(+row.id)).slice(0,100)});
+   }
+   catalogStatus('Resolving ship names '+done+'/'+chunks.length+(failures?' · '+failures+' failed':''));
   });
-  const catalog=[...new Map(matched.map(s=>[s.id,s])).values()].sort((a,b)=>a.name.localeCompare(b.name));
-  if(!catalog.length)throw Error('No hull names resolved from ship groups');
+  // Every category type ID is retained; unpublished/unresolvable IDs get a
+  // conspicuous placeholder rather than silently disappearing from the export.
+  const catalog=numbers.map(id=>matched.get(id)||{id,name:'UNRESOLVED TYPE #'+id,group:String(ids.get(id)).slice(0,100)})
+   .sort((a,b)=>a.name.localeCompare(b.name));
+  const missingNames=numbers.length-matched.size;
+  if(!catalog.length)throw Error('No ship types could be indexed');
   if(failures===0){
-   shipCatalog=catalog;catalogComplete=true;
-   try{localStorage.setItem(SHIP_CATALOG_KEY,JSON.stringify({version:1,at:Date.now(),ships:catalog}));}catch(_){}
+   shipCatalog=catalog;catalogComplete=true;catalogCacheAt=Date.now();
+   catalogGroupCount=groups.length;catalogMissingNames=missingNames;
+   try{localStorage.setItem(SHIP_CATALOG_KEY,JSON.stringify({
+    version:2,at:catalogCacheAt,groups:groups.length,missingNames,ships:catalog
+   }));}catch(_){}
   }else if(!shipCatalog.length){
-   shipCatalog=catalog;catalogComplete=false;
+   shipCatalog=catalog;catalogComplete=false;catalogMissingNames=missingNames;
+   catalogGroupCount=groups.length;
   }
   shipMenus();refreshCatalogMatches();
-  if(failures)finalMessage='Ship catalog refresh incomplete: '+failures+' ESI request(s) failed. '+shipCatalog.length+
-   ' hulls available; retry to refresh. Existing complete cache retained when available.';
- }catch(error){finalMessage='Ship catalog unavailable · '+error.message+
-  '. You can still enter an exact EVE hull name and fetch it directly.';}
- finally{catalogLoading=false;$('shipCatalogLoad').disabled=false;refreshCatalogMatches();if(finalMessage)catalogStatus(finalMessage);}
+  if(failures)finalMessage='Catalog refresh incomplete: '+failures+' ESI requests failed. Last complete cache retained when available. Retry when online.';
+  else if(missingNames)finalMessage=shipCatalog.length+' ship-category IDs retrieved across '+groups.length+
+   ' groups; '+missingNames+' unpublished or unresolved names are labeled by type ID.';
+ }catch(error){finalMessage='EVE ship catalog could not be retrieved: '+error.message+
+  '. Cached hulls remain available; enter an EVE hull name manually if necessary.';}
+ finally{
+  catalogLoading=false;$('shipCatalogLoad').disabled=false;refreshCatalogMatches();
+  if(finalMessage)catalogStatus(finalMessage);
+ }
 }
 async function addShipFromCatalog(id){
  const entry=shipCatalog.find(s=>s.id===+id);
@@ -133,15 +187,18 @@ async function addShipFromCatalog(id){
  return ship;
 }
 function shipCatalogInit(){
- loadCachedShipCatalog();shipMenus();refreshCatalogMatches();
+ const fresh=loadCachedShipCatalog();
+ shipMenus();refreshCatalogMatches();
  $('shipCatalogSearch').addEventListener('input',refreshCatalogMatches);
  $('shipCatalogLoad').addEventListener('click',fetchShipCatalog);
+ $('shipCatalogExport').addEventListener('click',exportShipCatalog);
  $('shipCatalogAdd').addEventListener('click',async()=>{
   const btn=$('shipCatalogAdd');btn.disabled=true;
   try{await addShipFromCatalog($('shipCatalogResults').value);}
   catch(e){shipMessage('Could not add ship · '+e.message);}
   finally{refreshCatalogMatches();}
  });
+ if(!fresh)fetchShipCatalog(); // Nonblocking: finish UI startup while ESI loads.
 }
 function shipMenus(){
  const saved='<optgroup label="Saved ship profiles">'+shipLibrary.map(s=>'<option value="'+L.escape(s.id)+'">'+L.escape(s.name)+' · '+L.escape(s.hull)+'</option>').join('')+'</optgroup>';
