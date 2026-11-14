@@ -86,7 +86,11 @@ function shipInit(){
  shipMenus();showShipEditor();
  $('shipLibrarySelect').addEventListener('change',showShipEditor);
  for(const role of Object.keys(SHIP_SELECTS))$(SHIP_SELECTS[role]).addEventListener('change',()=>{
-  selectedShips[role]=$(SHIP_SELECTS[role]).value;shipReadouts();settingsManager.schedule();
+  if(role==='mining'&&miningSession){$(SHIP_SELECTS[role]).value=selectedShips.mining;shipMessage('Finish or cancel the active mining calibration before switching miners.');return;}
+  if(role==='mining')rememberMiningCalibration();
+  selectedShips[role]=$(SHIP_SELECTS[role]).value;
+  if(role==='mining')restoreMiningCalibration();
+  shipReadouts();settingsManager.schedule();
   const p=chosenShip(role);
   if(p&&!p.base?.warp)fetchHull(p).then(()=>{if(role==='freight'){repriceFreight();drawRows();}if(role==='ore')miningRefresh();})
    .catch(e=>shipMessage('ESI ship lookup unavailable · '+e.message));
@@ -240,6 +244,30 @@ function miningSnapshot(){
   uptimePct:mineField('miningUptime'),handlingMinutes:mineField('miningHandling'),returnHome:$('miningReturn').checked,
   observedOreM3Hour:miningObserved.ore,observedIceM3Hour:miningObserved.ice,
   sort:$('miningSort').value,session:miningSession?{startedAt:miningSession.startedAt,kind:miningSession.kind}:null};
+}
+
+const MINING_CAL_FIELDS=[
+ ['oreYield','miningOreYield'],['oreCycle','miningOreCycle'],['oreModules','miningOreModules'],
+ ['iceUnits','miningIceUnits'],['iceCycle','miningIceCycle'],['iceModules','miningIceModules'],['uptimePct','miningUptime']
+];
+function rememberMiningCalibration(){
+ const ship=chosenShip('mining');if(!ship)return;
+ const values={profileName:$('miningProfileName').value.trim().slice(0,56)||ship.name};
+ for(const [key,id] of MINING_CAL_FIELDS){const v=$(id).value.trim();values[key]=v===''?null:Number(v);}
+ values.observedOreM3Hour=miningObserved.ore;
+ values.observedIceM3Hour=miningObserved.ice;
+ ship.miningCalibration=values;
+}
+function restoreMiningCalibration(){
+ const ship=chosenShip('mining');if(!ship)return;
+ const saved=ship.miningCalibration;
+ $('miningProfileName').value=saved?.profileName||ship.name+' / '+ship.hull;
+ for(const [key,id] of MINING_CAL_FIELDS){
+  const def=key==='oreModules'||key==='iceModules'?2:key==='uptimePct'?100:'';
+  const value=saved?.[key];$(id).value=value===null||value===undefined?def:value;
+ }
+ miningObserved.ore=Number(saved?.observedOreM3Hour)>0?Number(saved.observedOreM3Hour):null;
+ miningObserved.ice=Number(saved?.observedIceM3Hour)>0?Number(saved.observedIceM3Hour):null;
 }
 function miningKind(item){return RESOURCES.ice.includes(item.name)?'ice':'ore';}
 function miningMetric(item,v){
@@ -1031,6 +1059,7 @@ const settingsManager=(()=>{
   let channels=[];try{channels=JSON.parse(readLocal(keys.channels,'[]'));}catch(_){}
   if(!Array.isArray(channels))channels=[];
   const n=Number(readLocal(keys.volume,'55'));
+  rememberMiningCalibration();
   return {schemaVersion:1,livery:readLocal(keys.livery,'neon'),
    radio:{volume:Number.isFinite(n)?Math.max(0,Math.min(100,n)):55,shuffle:readLocal(keys.shuffle,'0')==='1',channels:channels.slice(0,40),selectedChannelId:readLocal(keys.last,'')},
    scanner:{system:$('systemInput').value.trim(),hub:$('hubSelect').value,resource:state.resource,cargo:Math.max(1,Math.trunc(+$('cargoVolume').value||31625))},haul:{...freightInputs(),capacity:Math.max(1,+$('haulCapacity').value||31625)},mining:miningSnapshot(),trade:tradeSettings(),ships:{library:shipLibrary,selections:selectedShips}};
@@ -1064,6 +1093,7 @@ const settingsManager=(()=>{
   if(Array.isArray(savedShips.library)&&savedShips.library.length>0&&savedShips.library.length<=32&&savedShips.library.every(p=>p&&Array.isArray(p.modules)&&validShip(p)))shipLibrary=savedShips.library.map(p=>({...p,base:{...p.base},modules:[...p.modules]}));
   for(const role of Object.keys(selectedShips))if(typeof savedShips.selections?.[role]==='string')selectedShips[role]=savedShips.selections[role];
   shipMenus();
+  if(chosenShip('mining')?.miningCalibration)restoreMiningCalibration();else rememberMiningCalibration();
   const savedTrade=data.trade||{};
   if(Number.isFinite(+savedTrade.budget)&&+savedTrade.budget>=1&&+savedTrade.budget<=1e12)$('tradeBudget').value=+savedTrade.budget;
   if(Number.isFinite(+savedTrade.handling)&&+savedTrade.handling>=.1&&+savedTrade.handling<=10000)$('tradeHandling').value=+savedTrade.handling;
