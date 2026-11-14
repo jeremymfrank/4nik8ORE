@@ -256,6 +256,15 @@ async function fetchCompleteOrders(region,typeId){
  const full=Accuracy.validateBook(batches.flat(),typeId).map(o=>({...o,regionId:region.id,regionName:region.name}));
  return {orders:full,pages:first.xPages,observedAt:first.observedAt,modified:first.modified,expires:first.expires};
 }
+async function getOrders(regionId,typeId,side='all'){
+ const result=await fetchCompleteOrders({id:+regionId,name:'Region #'+regionId},+typeId);
+ return result.orders.filter(o=>side==='all'||o.isBuy===(side==='buy')).map(o=>({
+  order_id:o.orderId,type_id:o.typeId,price:o.price,
+  volume_remain:o.volumeRemain,volume_total:o.volumeTotal,min_volume:o.minVolume,
+  range:o.range,location_id:o.locationId,system_id:o.systemId,
+  is_buy_order:o.isBuy,issued:o.issued,duration:o.duration
+ }));
+}
 function summarize(orders,region,filter='all'){
  const mapped=orders?.length&&orders[0].orderId?orders:
   Accuracy.validateBook(orders||[],orders?.[0]?.type_id);
@@ -598,5 +607,5 @@ function init(){
  });
 }
 global.ICMarketExplorer={loadCatalog,catalogItems,resourceItems,compressedFor,catalogState,itemFromSearch,
- regions,summarize,init,explore,familyOf,esi,marketGroupCount:itemCount};
+ regions,summarize,getOrders,init,explore,familyOf,esi,marketGroupCount:itemCount};
 })(window);
