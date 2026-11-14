@@ -23,7 +23,7 @@ catch {
     Write-Host 'IMPORTANT: close the previous server window before running an updated version.'
     exit 1
 }
-Write-Host "4NIK8 Industrial Command v0.6.0 - $prefix" -ForegroundColor Cyan
+Write-Host "4NIK8 Industrial Command v0.6.1 - $prefix" -ForegroundColor Cyan
 Write-Host "Saved channels and preferences: $settingsFile"
 Write-Host 'Keep this window running. Ctrl+C closes the application server.'
 Start-Process $prefix
@@ -69,7 +69,7 @@ try {
       $validLength = [int]::TryParse([string]$headers['content-length'],[ref]$length)
       if (($origin -and $origin -ne "http://127.0.0.1:$port") -or
           -not ([string]$type).StartsWith('application/json') -or
-          -not $validLength -or $length -lt 2 -or $length -gt 131072) {
+          -not $validLength -or $length -lt 2 -or $length -gt 1048576) {
          $status = '400 Bad Request'; $data = $utf8.GetBytes('{"error":"Invalid settings request"}')
       }
       else {
@@ -335,8 +335,11 @@ try {
             }
             catch {
                $status = '400 Bad Request'
-               $data = $utf8.GetBytes('{"error":"Settings were not saved. Check values or storage permissions."}')
-               Write-Host "Settings save rejected: $_" -ForegroundColor Yellow
+               $reason = [string]$_.Exception.Message
+               if ($reason.Length -gt 220) { $reason = $reason.Substring(0,220)+'...' }
+               $jsonError = ConvertTo-Json -InputObject ([ordered]@{error=$reason}) -Compress
+               $data = $utf8.GetBytes($jsonError)
+               Write-Host "Settings save rejected: $reason" -ForegroundColor Yellow
             }
          }
       }
