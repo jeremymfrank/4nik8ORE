@@ -478,6 +478,7 @@ function renderResults(){
 async function explore(){
  const button=$('marketExplorerGo');if(button.disabled)return;
  button.disabled=true;const token=++scanCount;
+ lastScan=null;$('marketExportOrders').disabled=true;
  $('marketExplorerCharts').innerHTML='';$('marketExplorerTable').innerHTML='';
  $('marketBestBuy').textContent='—';$('marketBestSell').textContent='—';
  $('marketItemHeadline').textContent='Reading ESI order books…';
@@ -531,6 +532,26 @@ function init(){
  $('marketCatalogExport').addEventListener('click',exportCatalog);
  $('marketItemSearch').addEventListener('input',populateSearch);
  $('marketExplorerForm').addEventListener('submit',e=>{e.preventDefault();explore();});
+ for(const id of ['marketQuantity','marketAccessFilter'])$(id).addEventListener('change',()=>{
+  if(!lastScan)return;
+  try{renderResults();}catch(e){notice('marketQuantitySummary','Invalid quantity: '+e.message);}
+ });
+ for(const id of ['marketAuditRegion','marketAuditSide'])$(id).addEventListener('change',()=>{
+  auditPage=0;renderAudit();
+ });
+ $('marketAuditPrev').addEventListener('click',()=>{auditPage--;renderAudit();});
+ $('marketAuditNext').addEventListener('click',()=>{auditPage++;renderAudit();});
+ $('marketExportOrders').addEventListener('click',exportOrders);
+ $('marketSendToTrade').addEventListener('click',()=>{
+  const item=lastScan?.item.name||$('marketItemSearch').value.trim();
+  if(!item)return;
+  $('tradeItems').value=item;
+  $('tradeScan').click();
+  notice('marketExplorerStatus','Sent '+item+' to the Trade Run Scanner for stargate routing, taxes, trade capital and modeled profit. Review its independent NPC-station assumptions.');
+ });
+ for(const id of ['marketExplorerScope','marketDeliveryStation'])$(id).addEventListener('change',()=>{
+  if(lastScan)notice('marketExplorerStatus','Region scope or delivery station changed. Run FIND BEST BUY & SELL ORDERS again to refresh order range eligibility.');
+ });
 }
 global.ICMarketExplorer={loadCatalog,catalogItems,resourceItems,compressedFor,catalogState,itemFromSearch,
  regions,summarize,init,explore,familyOf,esi,marketGroupCount:itemCount};
