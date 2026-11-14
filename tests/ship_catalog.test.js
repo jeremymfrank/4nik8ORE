@@ -10,7 +10,7 @@ const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
 const anchor='settingsManager.load().finally(()=>{shipInit();liveryInit();radioInit();miningInit();window.ICMarketExplorer.init();window.ICResourceBrowser.init(state.resource);});';
 assert(app.includes(anchor),'App startup hook changed; update this regression test');
 const testApp=app.replace(anchor,
- 'window.__test={shipCatalogInit,shipInit,fetchShipCatalog,addShipFromCatalog,catalogCsv,getLibrary:()=>shipLibrary,getCatalog:()=>shipCatalog,getSelections:()=>selectedShips};');
+ 'window.__test={shipCatalogInit,shipInit,fetchShipCatalog,addShipFromCatalog,ensureHullAttributes,catalogCsv,getLibrary:()=>shipLibrary,getCatalog:()=>shipCatalog,getSelections:()=>selectedShips};');
 const elements=new Map();
 function element(id){
  if(!elements.has(id))elements.set(id,{id,value:'',innerHTML:'',textContent:'',disabled:false,
@@ -65,8 +65,8 @@ new Function('window','document','fetch','localStorage','setTimeout','clearTimeo
  await win.__test.shipCatalogInit(); // ESI fetch starts automatically on first use.
  win.__test.shipInit(); // On a cached startup, no additional category fetch occurs.
  // The new simple garage must fetch base stats automatically, with no user button.
- await new Promise(resolve=>setImmediate(resolve));
  const retriever=win.__test.getLibrary().find(p=>p.id==='retriever');
+ await win.__test.ensureHullAttributes(retriever);
  assert.equal(retriever.name,'Retriever');
  assert.equal(retriever.base.mining,27500);
  assert.equal(element('shipGeneral').value,550);
