@@ -128,14 +128,14 @@ try {
                $selection = [string]$doc.radio.selectedChannelId
                if ($selection.Length -gt 90) { $selection = '' }
                # Extra freight fields are optional for backwards-compatible v0.3/v0.4 settings.
-               $haul = [ordered]@{capacity=31625;taxPct=7.5;cashPerJump=0;minutesPerJump=2;pilotISKHour=0;preference='Safer'}
+               $haul = [ordered]@{capacity=31625;taxPct=7.5;cashPerJump=0;minutesPerJump=2;averageAU=20;pilotISKHour=0;preference='Safer'}
                if ($null -ne $doc.haul) {
-                  foreach ($name in @('capacity','taxPct','cashPerJump','minutesPerJump','pilotISKHour')) {
+                  foreach ($name in @('capacity','taxPct','cashPerJump','minutesPerJump','averageAU','pilotISKHour')) {
                      if ($null -ne $doc.haul.$name) {
                         $n = 0.0
                         if (-not [double]::TryParse([string]$doc.haul.$name,[ref]$n)) { throw 'Invalid haul cost' }
-                        $limit = switch ($name) { 'capacity' {10000000} 'taxPct' {100} 'cashPerJump' {100000000} 'minutesPerJump' {120} 'pilotISKHour' {1000000000} }
-                        $min = if ($name -eq 'capacity') {1} elseif ($name -eq 'minutesPerJump') {0.1} else {0}
+                        $limit = switch ($name) { 'capacity' {10000000} 'taxPct' {100} 'cashPerJump' {100000000} 'minutesPerJump' {120} 'averageAU' {250} 'pilotISKHour' {1000000000} }
+                        $min = if ($name -eq 'capacity') {1} elseif ($name -eq 'minutesPerJump' -or $name -eq 'averageAU') {0.1} else {0}
                         if ($n -lt $min -or $n -gt $limit) { throw 'Haul cost out of range' }
                         $haul[$name] = $n
                      }
@@ -199,6 +199,116 @@ try {
                   if ($null -ne $doc.trade.returnHome) {
                      if ($doc.trade.returnHome -isnot [bool]) { throw 'Invalid trade return flag' }
                      $trade.returnHome=[bool]$doc.trade.returnHome
+                  }
+               }
+
+               # v0.5.0 shared ship fits. Accept only bounded, data-only profiles.
+               $ships = [ordered]@{library=@();selections=[ordered]@{mining='retriever';freight='manual';ore='manual';trade='manual'}}
+               if ($null -ne $doc.ships) {
+                  $submitted = @($doc.ships.library)
+                  if ($submitted.Count -gt 32) { throw 'Too many ship profiles' }
+                  $cleanShips = @()
+                  $usedIds = @{}
+                  $allowedModules = @('expanded cargohold i','expanded cargohold ii','cargohold optimization i','cargohold optimization ii',
+                     'inertial stabilizers i','inertial stabilizers ii','nanofiber internal structure i','nanofiber internal structure ii',
+                     'low friction nozzle joints i','low friction nozzle joints ii','polycarbon engine housing i','polycarbon engine housing ii',
+                     'hyperspatial velocity optimizer i','hyperspatial velocity optimizer ii','limited hyperspatial accelerator',
+                     'experimental hyperspatial accelerator','prototype hyperspatial accelerator')
+                  foreach ($p in $submitted) {
+                     $pid = [string]$p.id; $pname = [string]$p.name; $hull = [string]$p.hull
+                     if ($pid -cnotmatch '^[a-zA-Z0-9_-]{1,80} livery=[string]$doc.livery;
+                  radio=[ordered]@{volume=$volume;shuffle=$shuffle;channels=$cleanChannels;selectedChannelId=$selection};
+                  scanner=[ordered]@{system=$sys;hub=$hub;resource=$resource;cargo=$cargo};haul=$haul;mining=$mining;trade=$trade;ships=$ships
+               }
+               $json = ConvertTo-Json -InputObject $clean -Depth 12 -Compress
+               if (-not (Test-Path -LiteralPath $dataRoot)) { [System.IO.Directory]::CreateDirectory($dataRoot) | Out-Null }
+               $temp = Join-Path $dataRoot ('.settings-'+[guid]::NewGuid().ToString('N')+'.tmp')
+               [System.IO.File]::WriteAllBytes($temp, $utf8.GetBytes($json))
+               if (Test-Path -LiteralPath $settingsFile) {
+                  try { [System.IO.File]::Replace($temp,$settingsFile,$backupFile) }
+                  catch {
+                     Copy-Item -LiteralPath $settingsFile -Destination $backupFile -Force
+                     Move-Item -LiteralPath $temp -Destination $settingsFile -Force
+                  }
+               }
+               else { Move-Item -LiteralPath $temp -Destination $settingsFile }
+               $data = $utf8.GetBytes('{"ok":true}')
+            }
+            catch {
+               $status = '400 Bad Request'
+               $data = $utf8.GetBytes('{"error":"Settings were not saved. Check values or storage permissions."}')
+               Write-Host "Settings save rejected: $_" -ForegroundColor Yellow
+            }
+         }
+      }
+   }
+   elseif ($types.ContainsKey($path) -and ($method -eq 'GET' -or $method -eq 'HEAD')) {
+      $file = if ($path -eq '/') { 'index.html' } else { $path.Substring(1) }
+      $data = [System.IO.File]::ReadAllBytes((Join-Path $root $file))
+      $mime = $types[$path]
+   }
+   elseif ($path -eq '/api/settings') {
+      $status = '405 Method Not Allowed'; $data = $utf8.GetBytes('{"error":"Method not allowed"}')
+   }
+   else {
+      $status = '404 Not Found'; $data = $utf8.GetBytes('{"error":"Not found"}')
+   }
+   $header = "HTTP/1.1 $status`r`nContent-Type: $mime`r`nContent-Length: $($data.Length)`r`nX-Content-Type-Options: nosniff`r`nReferrer-Policy: strict-origin-when-cross-origin`r`nCache-Control: no-store`r`nConnection: close`r`n`r`n"
+   $out = [System.Text.Encoding]::ASCII.GetBytes($header)
+   $stream.Write($out,0,$out.Length)
+   if ($method -ne 'HEAD' -and $data.Length -gt 0) { $stream.Write($data,0,$data.Length) }
+   $stream.Flush()
+  }
+  catch { Write-Host "HTTP request error: $_" -ForegroundColor Yellow }
+  finally { $client.Dispose() }
+ }
+}
+finally { $listener.Stop() } -or $usedIds.ContainsKey($pid) -or
+                        $pname.Length -lt 1 -or $pname.Length -gt 64 -or $hull.Length -lt 1 -or $hull.Length -gt 64) {
+                        throw 'Invalid ship identity'
+                     }
+                     $usedIds[$pid]=$true
+                     $mods = @($p.modules)
+                     if ($mods.Count -gt 30) { throw 'Too many ship modifiers' }
+                     $cleanMods=@()
+                     foreach ($mod in $mods) {
+                        $name = [string]$mod
+                        if ($allowedModules -cnotcontains $name) { throw 'Unknown ship modifier' }
+                        $cleanMods += $name
+                     }
+                     $base = [ordered]@{}
+                     foreach ($key in @('general','mining','mineral','fleet','mass','inertia','warp','maxSpeed')) {
+                        $n=0.0
+                        if ($null -ne $p.base.$key) {
+                           if (-not [double]::TryParse([string]$p.base.$key,[System.Globalization.NumberStyles]::Float,
+                               [System.Globalization.CultureInfo]::InvariantCulture,[ref]$n)) { throw 'Invalid ship base value' }
+                        }
+                        if ([double]::IsNaN($n) -or [double]::IsInfinity($n) -or $n -lt 0 -or $n -gt 100000000000) { throw 'Ship base out of range' }
+                        $base[$key]=$n
+                     }
+                     $clean = [ordered]@{id=$pid;name=$pname;hull=$hull;base=$base;modules=$cleanMods}
+                     foreach ($key in @('cargoSkillPct','specialHoldSkillPct','exactCapacity','exactAlign','exactWarp')) {
+                        $n=0.0
+                        if ($null -ne $p.$key) {
+                           if (-not [double]::TryParse([string]$p.$key,[System.Globalization.NumberStyles]::Float,
+                               [System.Globalization.CultureInfo]::InvariantCulture,[ref]$n)) { throw 'Invalid fitted value' }
+                        }
+                        if ([double]::IsNaN($n) -or [double]::IsInfinity($n) -or $n -lt $(if ($key -match 'Skill') {-90} else {0}) -or $n -gt 1000000000) {
+                           throw 'Fitted value out of range'
+                        }
+                        $clean[$key]=$n
+                     }
+                     $kind = [string]$p.exactCapacityKind
+                     $clean.exactCapacityKind = if (@('general','mining','mineral') -contains $kind) {$kind} else {'general'}
+                     $tid=0
+                     [int]::TryParse([string]$p.typeId,[ref]$tid) | Out-Null
+                     if ($tid -gt 0) { $clean.typeId=$tid }
+                     $cleanShips += $clean
+                  }
+                  $ships.library = $cleanShips
+                  foreach ($role in @('mining','freight','ore','trade')) {
+                     $v = [string]$doc.ships.selections.$role
+                     if ($v -eq 'manual' -or $usedIds.ContainsKey($v)) { $ships.selections[$role]=$v }
                   }
                }
                $clean = [ordered]@{
