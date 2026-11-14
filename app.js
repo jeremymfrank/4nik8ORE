@@ -384,7 +384,7 @@ function buildTasks(types,regions,force){
   for(const form of ['raw','compressed']){
    const typeId=form==='raw'?t.id:t.compressedId;if(!typeId)continue;
    for(const region of regions){
-    jobs.push({name:t.name,form,region,typeId,job:()=>request('/markets/'+region+'/orders/?order_type=buy&type_id='+typeId,{},CACHE_TTL,force)});
+    jobs.push({name:t.name,form,region,typeId,job:()=>window.ICMarketExplorer.getOrders(region,typeId,'buy')});
    }
   }
  }
@@ -1149,7 +1149,7 @@ function tradeEstimate(quote,jumpPickup,jumpLoaded,jumpHome,opts){
 }
 async function loadTradeRegionOrders(types,regions){
  const work=[];
- for(const item of types)for(const region of regions)work.push({item,region,job:()=>request('/markets/'+region+'/orders/?order_type=all&type_id='+item.id,{},CACHE_TTL)});
+ for(const item of types)for(const region of regions)work.push({item,region,job:()=>window.ICMarketExplorer.getOrders(region,item.id,'all')});
  const books=new Map();let failures=0,done=0;
  await pool(work.map(w=>w.job),5,(i,data,error)=>{
   const w=work[i];if(!error&&Array.isArray(data))books.set(w.item.id+'|'+w.region,data);
