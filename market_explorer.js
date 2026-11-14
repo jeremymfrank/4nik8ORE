@@ -210,113 +210,317 @@ async function regions(){
  regionCache=ids.map(id=>({id:+id,name:named.get(+id)||KNOWN[id]||'Region #'+id}));
  return regionCache;
 }
-function summarize(orders,region){
- let ask=null,bid=null,askCount=0,bidCount=0,askVolume=0,bidVolume=0;
- for(const o of orders){
-  if(!Number.isFinite(+o.price)||+o.price<=0||!(+o.volume_remain>0)||!o.location_id)continue;
-  const item={price:+o.price,volume:+o.volume_remain,minVolume:+o.min_volume||1,
-   locationId:o.location_id,systemId:o.system_id};
-  if(o.is_buy_order){
-   bidCount++;bidVolume+=item.volume;
-   if(!bid||item.price>bid.price)bid=item;
-  }else{
-   askCount++;askVolume+=item.volume;
-   if(!ask||item.price<ask.price)ask=item;
-  }
- }
- return {...region,ask,bid,askCount,bidCount,askVolume,bidVolume};
+
+const Accuracy=global.ICMarketAccuracy;
+let lastScan=null,auditPage=0;
+const PAGE_SIZE=50;
+const pretty=n=>Number(n).toLocaleString('en-US',{maximumFractionDigits:0});
+const isk=n=>Accuracy.price(n);
+const pathMarket=(regionId,typeId,page)=>'/markets/'+regionId+'/orders/?order_type=all&type_id='+typeId+
+ (page>1?'&page='+page:'');
+async function fetchMarketPage(regionId,typeId,page=1){
+ const path=pathMarket(regionId,typeId,page),key='marketpage|'+path,prior=cache(key,MARKET_TTL);
+ if(prior!==null)return prior;
+ const url='https://esi.evetech.net'+path+'&datasource=tranquility';
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),22000);
+ try{
+  const response=await fetch(url,{headers:{'Accept':'application/json','X-Compatibility-Date':'2025-12-16'},
+   signal:controller.signal});
+  if(!response.ok)throw Error('ESI '+response.status+' '+(response.status===420||response.status===429?
+   'market rate limit':response.statusText));
+  const body=await response.json();
+  if(!Array.isArray(body))throw Error('Market orders response is not an array');
+  const xPages=Number(response.headers?.get?.('X-Pages')||1);
+  if(!Number.isInteger(xPages)||xPages<1||xPages>500)throw Error('Unreasonable ESI X-Pages header: '+xPages);
+  const result={body,xPages,observedAt:Date.now(),modified:response.headers?.get?.('Last-Modified')||'',
+   expires:response.headers?.get?.('Expires')||''};
+  mem.set(key,{data:result,time:Date.now()});return result;
+ }finally{clearTimeout(timer);}
 }
-async function describeMarketLocations(rows){
- const systems=[...new Set(rows.flatMap(r=>[r.ask?.systemId,r.bid?.systemId]).filter(x=>Number.isInteger(+x)&&+x>0).map(Number))];
- let nameById=new Map();
- try{nameById=new Map((await resolveNames(systems)).map(x=>[+x.id,x.name]));}catch(_){}
- for(const r of rows)for(const order of [r.ask,r.bid])if(order){
-  order.systemName=nameById.get(+order.systemId)||'System #'+order.systemId;
+async function fetchCompleteOrders(region,typeId){
+ const first=await fetchMarketPage(region.id,typeId,1);
+ const batches=[first.body],pageErrors=[];
+ if(first.xPages>1){
+  const pages=Array.from({length:first.xPages-1},(_,i)=>i+2);
+  await pool(pages.map(page=>async()=>fetchMarketPage(region.id,typeId,page)),2,(index,result,error)=>{
+   if(error)pageErrors.push('page '+pages[index]+' '+error.message);
+   else batches.push(result.body);
+  });
  }
- const bestAsk=rows.filter(r=>r.ask).sort((a,b)=>a.ask.price-b.ask.price)[0]?.ask;
- const bestBid=rows.filter(r=>r.bid).sort((a,b)=>b.bid.price-a.bid.price)[0]?.bid;
- const orders=[...new Set([bestAsk,bestBid].filter(Boolean))];
- await pool(orders.map(order=>async()=>{
-  const id=+order.locationId;
-  if(id>=60000000&&id<64000000){
-   const data=await esi('/universe/stations/'+id+'/',{ttl:DAY});
-   return {order,name:data.name};
-  }
-  return {order,name:order.systemName+' · structure #'+id+' (access unverified)'};
- }),2,(_,result)=>{if(result)result.order.stationName=result.name;});
+ if(pageErrors.length)throw Error(region.name+' missing '+pageErrors.length+' of '+first.xPages+' order pages; region excluded');
+ const full=Accuracy.validateBook(batches.flat(),typeId).map(o=>({...o,regionId:region.id,regionName:region.name}));
+ return {orders:full,pages:first.xPages,observedAt:first.observedAt,modified:first.modified,expires:first.expires};
 }
-function orderLocation(order){
- return order?(order.stationName||order.systemName+' · location #'+order.locationId):'—';
+function summarize(orders,region,filter='all'){
+ const mapped=orders?.length&&orders[0].orderId?orders:
+  Accuracy.validateBook(orders||[],orders?.[0]?.type_id);
+ return Accuracy.regionSummary(mapped.map(o=>({...o,regionId:region.id,regionName:region.name})),region,filter);
+}
+async function localOperatingContext(){
+ const text=$('systemInput')?.value?.trim();
+ if(!text)return null;
+ try{
+  const found=await esi('/universe/ids/',{method:'POST',body:JSON.stringify([text]),ttl:DAY});
+  const match=(found.systems||[]).find(x=>x.name.toLowerCase()===text.toLowerCase());
+  if(!match)return null;
+  const sys=await esi('/universe/systems/'+match.id+'/',{ttl:DAY});
+  const constellation=await esi('/universe/constellations/'+sys.constellation_id+'/',{ttl:DAY});
+  return {regionId:+constellation.region_id,systemId:+match.id,systemName:sys.name||text};
+ }catch(_){return null;}
+}
+async function deliveryFromInputs(local){
+ if(!local)return null;
+ const raw=$('marketDeliveryStation').value.trim();
+ const base={...local,locationId:null};
+ if(!raw)return base;
+ const id=Number(raw);
+ if(!Number.isSafeInteger(id)||id<1||!Accuracy.isNpcStation(id))
+  throw Error('Delivery station must be a valid NPC station ID (60000000–63999999). Structure docking/access cannot be verified.');
+ const detail=await esi('/universe/stations/'+id+'/',{ttl:DAY});
+ if(Number(detail.system_id)!==local.systemId)
+  throw Error('Delivery station #'+id+' is not in '+local.systemName+'. Correct the station ID or operating system.');
+ return {...base,locationId:id,stationName:detail.name||'Station #'+id};
+}
+function orderLocation(o){
+ return o?.stationName||o?.systemName&&o.systemName+' · '+(o.isStructure?'structure':'location')+' #'+o.locationId||
+  (o?'Location #'+o.locationId:'—');
+}
+async function describeOrders(rows){
+ const orders=rows.flatMap(r=>[r.ask,r.bid]).filter(Boolean);
+ const systems=[...new Set(orders.map(o=>o.systemId))];
+ let names=[];
+ try{names=await resolveNames(systems);}catch(_){}
+ const lookup=new Map(names.filter(x=>x&&x.name).map(x=>[+x.id,x.name]));
+ for(const o of orders)o.systemName=lookup.get(o.systemId)||'System #'+o.systemId;
+ const leaders=rows.flatMap(r=>[r.ask,r.bid]).filter(Boolean).sort((a,b)=>b.price-a.price).slice(0,4);
+ await pool(leaders.filter(o=>o.isNpcStation).map(o=>async()=>{
+  const d=await esi('/universe/stations/'+o.locationId+'/',{ttl:DAY});
+  return {o,name:d.name};
+ }),2,(_,r)=>{if(r)r.o.stationName=r.name;});
+}
+function fmtOrder(o){
+ return o?isk(o.price):'—';
 }
 function fmt(n,d=2){return Number(n).toLocaleString('en-US',{maximumFractionDigits:d});}
 function orderRow(r){
- const buy=r.ask?.price, sell=r.bid?.price;
- const diff=buy&&sell?sell-buy:null;
- return '<tr><td>'+escape(r.name)+'</td><td class="num">'+(buy?fmt(buy):'—')+
-  '</td><td class="market-location">'+escape(orderLocation(r.ask))+
-  '</td><td class="num">'+(sell?fmt(sell):'—')+
-  '</td><td class="market-location">'+escape(orderLocation(r.bid))+'</td><td class="num">'+
-  (diff===null?'—':fmt(diff))+'</td><td class="num">'+
-  fmt(r.askVolume,0)+' / '+fmt(r.bidVolume,0)+'</td><td class="num">'+
-  r.askCount+' / '+r.bidCount+'</td></tr>';
+ const ask=r.ask,bid=r.bid,diff=ask&&bid?bid.price-ask.price:null;
+ return '<tr><td>'+escape(r.name)+'</td><td class="num">'+fmtOrder(ask)+
+  '</td><td class="market-location">'+escape(orderLocation(ask))+
+  '</td><td class="num">'+fmtOrder(bid)+
+  '</td><td class="market-location">'+escape(orderLocation(bid))+
+  '</td><td class="num">'+(diff===null?'—':isk(diff))+
+  '</td><td class="num">'+pretty(r.askVolume)+' / '+pretty(r.bidVolume)+
+  '</td><td class="num">'+r.askCount+' / '+r.bidCount+'</td></tr>';
 }
 function barRows(rows,kind){
- const key=kind==='buy'?'ask':'bid';
- const relevant=rows.filter(r=>r[key]?.price>0).sort((a,b)=>kind==='buy'?a.ask.price-b.ask.price:b.bid.price-a.bid.price).slice(0,12);
- const max=Math.max(...relevant.map(x=>x[key].price),1);
- if(!relevant.length)return '<p class="muted">No '+(kind==='buy'?'sell':'buy')+' orders reported in completed regions.</p>';
+ const key=kind==='buy'?'ask':'bid',ascending=kind==='buy';
+ const relevant=rows.filter(r=>r[key]?.price>0)
+  .sort((a,b)=>ascending?a.ask.price-b.ask.price:b.bid.price-a.bid.price).slice(0,12);
+ if(!relevant.length)return '<p class="muted">No public '+(ascending?'sell':'buy')+' orders in these completed regions.</p>';
+ const best=relevant[0][key].price;
  return relevant.map(r=>{
-  const width=Math.max(1,100*r[key].price/max);
+  // Longest bar = most favorable price, on BOTH sides of the market.
+  const width=ascending?100*best/r[key].price:100*r[key].price/best;
   return '<div class="market-bar-row"><span title="'+escape(r.name)+'">'+escape(r.name)+'</span>'+
-   '<div class="market-bar-track"><div class="market-bar-fill '+(kind==='buy'?'ask':'bid')+
-   '" style="width:'+width.toFixed(2)+'%"></div></div><b>'+fmt(r[key].price)+' ISK</b></div>';
+   '<div class="market-bar-track"><div class="market-bar-fill '+(ascending?'ask':'bid')+
+   '" style="width:'+Math.min(100,Math.max(1,width)).toFixed(2)+'%"></div></div><b>'+isk(r[key].price)+' ISK</b></div>';
  }).join('');
 }
-function showResults(item,rows,failed,total,stamp){
- const sorted=rows.filter(r=>r.ask||r.bid);
- const cheapest=[...sorted].filter(r=>r.ask).sort((a,b)=>a.ask.price-b.ask.price)[0];
- const bestbid=[...sorted].filter(r=>r.bid).sort((a,b)=>b.bid.price-a.bid.price)[0];
- $('marketItemHeadline').textContent=item.name+' · TYPE '+item.id+' · '+fmt(item.volume,3)+' m³/unit';
- $('marketBestBuy').textContent=cheapest?fmt(cheapest.ask.price)+' ISK':'NO PUBLIC SELL ORDERS';
- $('marketBestBuyLocation').textContent=cheapest?cheapest.name+' · '+fmt(cheapest.ask.volume,0)+' units · '+orderLocation(cheapest.ask):'No executable ask found';
- $('marketBestSell').textContent=bestbid?fmt(bestbid.bid.price)+' ISK':'NO PUBLIC BUY ORDERS';
- $('marketBestSellLocation').textContent=bestbid?bestbid.name+' · '+fmt(bestbid.bid.volume,0)+' units · min '+fmt(bestbid.bid.minVolume,0)+' · '+orderLocation(bestbid.bid):'No executable bid found';
- $('marketExplorerCharts').innerHTML='<div class="market-chart-column"><h4>LOWEST ASK · WHERE TO BUY</h4>'+
-  barRows(sorted,'buy')+'</div><div class="market-chart-column"><h4>HIGHEST BID · WHERE TO SELL</h4>'+barRows(sorted,'sell')+'</div>';
+function advertisedBest(rows,side){
+ return rows.filter(r=>side==='ask'?r.ask:r.bid).sort((a,b)=>side==='ask'?
+  a.ask.price-b.ask.price:b.bid.price-a.bid.price)[0]||null;
+}
+function allOrders(){return lastScan?.regions.flatMap(r=>r.orders)||[];}
+function getInputs(){
+ const quantity=Math.floor(+$('marketQuantity').value);
+ if(!Number.isSafeInteger(quantity)||quantity<1||quantity>1000000000)
+  throw Error('Enter a whole-number quantity between 1 and 1,000,000,000 units');
+ return {quantity,filter:$('marketAccessFilter').value==='npc'?'npc':'all'};
+}
+function renderRegionalTable(rows){
  const byRegion=[...rows].sort((a,b)=>Number(!!b.ask||!!b.bid)-Number(!!a.ask||!!a.bid)||
   (a.ask?.price??Infinity)-(b.ask?.price??Infinity));
- $('marketExplorerTable').innerHTML='<table class="market-prices-table"><thead><tr><th>REGION</th><th>LOWEST ASK<br>BUY HERE</th><th>BUY LOCATION</th><th>HIGHEST BID<br>SELL HERE</th><th>SELL LOCATION</th><th>RAW SPREAD*</th><th>ASK / BID<br>UNITS</th><th>ASK / BID<br>ORDERS</th></tr></thead><tbody>'+
+ $('marketExplorerTable').innerHTML='<table class="market-prices-table"><thead><tr>'+
+  '<th>REGION</th><th>LOWEST ASK<br>BUY HERE</th><th>BUY LOCATION</th>'+
+  '<th>HIGHEST BID<br>SELL HERE</th><th>SELL LOCATION</th><th>RAW SPREAD*</th>'+
+  '<th>ASK / BID<br>UNITS</th><th>ASK / BID<br>ORDERS</th></tr></thead><tbody>'+
   byRegion.map(orderRow).join('')+'</tbody></table>';
- notice('marketExplorerStatus','Checked '+(total-failed)+'/'+total+' ESI public regions at '+new Date(stamp).toLocaleString()+
-  ' · '+sorted.length+' regions with current orders · '+failed+' failed/unavailable · visible quantities are from public orders only.');
+}
+function renderLocalComparison(rows,lowest,highest){
+ const local=lastScan.local;
+ const region=rows.find(r=>r.id===local?.regionId);
+ const el=$('marketExplorerLocal');
+ if(!local){el.textContent='Local market comparison unavailable: enter a valid operating system in System Navigation.';return;}
+ if(!region){el.textContent=local.systemName+' · local region #'+local.regionId+
+  ' was not included in this scan. Select ALL PUBLIC REGIONS or OPERATING REGION ONLY.';return;}
+ el.innerHTML='<b>OPERATING REGION · '+escape(region.name)+'</b> · '+escape(local.systemName)+
+  ' · Lowest local ask: <strong>'+fmtOrder(region.ask)+'</strong> · Highest local bid: <strong>'+
+  fmtOrder(region.bid)+'</strong> · Global lowest ask: <strong>'+fmtOrder(lowest?.ask)+'</strong>'+
+  ' · Global highest bid: <strong>'+fmtOrder(highest?.bid)+'</strong>. Location and range still govern execution.';
+}
+function quantityLine(fill,quantity,side){
+ if(!fill)return 'No eligible '+side+' orders for this quantity.';
+ return (fill.full?'FULL '+pretty(quantity)+' units':'PARTIAL '+pretty(fill.filled)+'/'+pretty(quantity)+' units')+
+  ' · '+isk(fill.average)+' ISK/unit volume-weighted · '+isk(fill.total)+' ISK gross · '+
+  fill.legs.length+' order'+(fill.legs.length===1?'':'s')+
+  (fill.locationId?' · issuing location #'+fill.locationId:'');
+}
+function renderQuantity(rows,quantity,filter){
+ const orders=allOrders(),asks=Accuracy.bestStationFill(orders,quantity,'ask',filter);
+ const bids=Accuracy.bestStationFill(orders,quantity,'bid',filter);
+ const div=$('marketQuantitySummary');
+ let html='<b>QUANTITY-CHECKED STATION BOOKS · '+pretty(quantity)+' UNITS</b>'+
+  '<div><span>Buy from single seller station:</span> '+escape(quantityLine(asks,quantity,'ask'))+'</div>'+
+  '<div><span>Sell to single issuing-station book:</span> '+escape(quantityLine(bids,quantity,'bid'))+'</div>';
+ if(lastScan.delivery){
+  const localBuys=lastScan.regions.find(x=>x.id===lastScan.delivery.regionId);
+  if(localBuys){
+   const eligible=Accuracy.volumeFill(localBuys.orders,quantity,'bid',filter,lastScan.delivery);
+   const unknown=localBuys.orders.filter(x=>x.isBuy&&Accuracy.eligibility(x,lastScan.delivery)==='unknown').length;
+   html+='<div><span>Buy orders accepting delivery in '+escape(lastScan.local.systemName)+':</span> '+
+    escape(quantityLine(eligible,quantity,'bid'))+' · '+unknown+
+    ' orders have unverified range eligibility (including jump-radius routes)</div>';
+  }
+ }
+ div.innerHTML=html+'<small>Volume fills use original ESI remaining quantity and minimum-volume rules. Orders from different stations are not combined unless a known delivery location satisfies their range. Prices and locations may change before execution; structures remain access-unverified.</small>';
+}
+function auditOptions(){
+ const select=$('marketAuditRegion'),remember=select.value;
+ select.innerHTML='<option value="all">ALL SCANNED REGIONS</option>'+
+  lastScan.regions.map(r=>'<option value="'+r.id+'">'+escape(r.name)+'</option>').join('');
+ select.value=lastScan.regions.some(r=>String(r.id)===remember)?remember:'all';
+}
+function auditEntries(){
+ const select=$('marketAuditRegion').value,side=$('marketAuditSide').value;
+ return allOrders().filter(o=>(select==='all'||String(o.regionId)===select)&&
+   (side==='all'||o.isBuy===(side==='buy')))
+  .sort((a,b)=>side==='sell'?a.price-b.price:b.price-a.price);
+}
+function renderAudit(){
+ if(!lastScan)return;
+ const rows=auditEntries(),pages=Math.max(1,Math.ceil(rows.length/PAGE_SIZE));
+ auditPage=Math.min(Math.max(0,auditPage),pages-1);
+ const page=rows.slice(auditPage*PAGE_SIZE,(auditPage+1)*PAGE_SIZE);
+ $('marketAuditSummary').textContent=rows.length.toLocaleString()+
+  ' public order records matching the audit filters · '+allOrders().length.toLocaleString()+
+  ' total validated ESI records across '+lastScan.regions.length+
+  ' completed regions · exact order ID / price / volume / range retained · snapshot '+new Date(lastScan.stamp).toLocaleString();
+ const delivery=lastScan.delivery;
+ $('marketAuditTable').innerHTML='<table class="market-prices-table market-orders-table"><thead><tr>'+
+  '<th>REGION</th><th>ORDER ID</th><th>SIDE</th><th>UNIT PRICE · ISK</th><th>REMAINING</th>'+
+  '<th>ORIGINAL</th><th>MIN QTY</th><th>BUY RANGE</th><th>ISSUING LOCATION</th>'+
+  '<th>SYSTEM</th><th>ACCESS / DELIVERY</th></tr></thead><tbody>'+
+  page.map(o=>{
+   const eligible=delivery&&o.isBuy?Accuracy.eligibility(o,delivery):null;
+   const status=o.isStructure?'STRUCTURE · ACCESS UNVERIFIED':o.isNpcStation?'NPC STATION':'OTHER LOCATION';
+   return '<tr><td>'+escape(o.regionName)+'</td><td class="num">'+o.orderId+
+    '</td><td>'+(o.isBuy?'BUY BID':'SELL ASK')+'</td><td class="num">'+isk(o.price)+
+    '</td><td class="num">'+pretty(o.volumeRemain)+'</td><td class="num">'+pretty(o.volumeTotal)+
+    '</td><td class="num">'+pretty(o.minVolume)+'</td><td>'+escape(Accuracy.rangeLabel(o.range))+
+    '</td><td class="num">'+o.locationId+'</td><td class="num">'+o.systemId+
+    '</td><td>'+escape(status)+(eligible?' · DELIVERY '+eligible.toUpperCase():'')+'</td></tr>';
+  }).join('')+'</tbody></table>';
+ $('marketAuditPage').textContent=(auditPage+1)+' / '+pages;
+ $('marketAuditPrev').disabled=auditPage<=0;
+ $('marketAuditNext').disabled=auditPage>=pages-1;
+ $('marketExportOrders').disabled=!lastScan.regions.length;
+}
+function exportOrders(){
+ if(!lastScan)return;
+ const q=s=>'"'+String(s??'').replace(/"/g,'""')+'"';
+ const headers=['region_id','region','order_id','type_id','is_buy_order','price_isk','volume_remain',
+  'volume_total','min_volume','range','location_id','system_id','issued','duration','structure_access_unverified'];
+ const csv='\uFEFF'+[headers,...allOrders().map(o=>[
+  o.regionId,o.regionName,o.orderId,o.typeId,o.isBuy,o.price,o.volumeRemain,
+  o.volumeTotal,o.minVolume,o.range,o.locationId,o.systemId,o.issued,o.duration,o.isStructure
+ ])].map(a=>a.map(q).join(',')).join('\r\n')+'\r\n';
+ const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob);
+ const node=document.createElement('a');node.href=url;node.download='4nik8-public-orders-'+
+  lastScan.item.id+'-'+new Date().toISOString().slice(0,10)+'.csv';
+ document.body.appendChild(node);node.click();node.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1200);
+}
+function renderResults(){
+ if(!lastScan)return;
+ const {quantity,filter}=getInputs(),rows=lastScan.regions.map(r=>summarize(r.orders,{id:r.id,name:r.name},filter));
+ for(const r of rows){
+  const original=lastScan.regions.find(x=>x.id===r.id);
+  const reference=original?.orders||[];
+  for(const o of [r.ask,r.bid])if(o){
+   const source=reference.find(x=>x.orderId===o.orderId);
+   if(source){o.systemName=source.systemName;o.stationName=source.stationName;}
+  }
+ }
+ const sorted=rows.filter(r=>r.ask||r.bid);
+ const cheapest=advertisedBest(sorted,'ask'),highest=advertisedBest(sorted,'bid');
+ $('marketItemHeadline').textContent=lastScan.item.name+' · TYPE '+lastScan.item.id+
+  ' · '+fmt(lastScan.item.volume,3)+' m³/unit · '+pretty(quantity)+' units requested';
+ $('marketBestBuy').textContent=cheapest?isk(cheapest.ask.price)+' ISK':'NO PUBLIC SELL ORDERS';
+ $('marketBestBuyLocation').textContent=cheapest?cheapest.name+' · '+pretty(cheapest.ask.volumeRemain)+
+  ' units · '+orderLocation(cheapest.ask):'No advertised ask found';
+ $('marketBestSell').textContent=highest?isk(highest.bid.price)+' ISK':'NO PUBLIC BUY ORDERS';
+ $('marketBestSellLocation').textContent=highest?highest.name+' · '+pretty(highest.bid.volumeRemain)+
+  ' units · min '+pretty(highest.bid.minVolume)+' · '+Accuracy.rangeLabel(highest.bid.range)+
+  ' · '+orderLocation(highest.bid)+(highest.bid.isStructure?' · STRUCTURE ACCESS UNVERIFIED':''):'No advertised bid found';
+ $('marketExplorerCharts').innerHTML='<div class="market-chart-column"><h4>LOWEST ASK · WHERE TO BUY · LONGEST BAR = BEST</h4>'+
+  barRows(sorted,'buy')+'</div><div class="market-chart-column"><h4>HIGHEST BID · WHERE TO SELL · LONGEST BAR = BEST</h4>'+
+  barRows(sorted,'sell')+'</div>';
+ renderRegionalTable(rows);
+ renderLocalComparison(rows,cheapest,highest);
+ renderQuantity(rows,quantity,filter);
+ renderAudit();
+ notice('marketExplorerStatus','Checked '+lastScan.regions.length+'/'+lastScan.total+
+  ' public ESI regions · '+lastScan.pages+' market-order pages · '+allOrders().length.toLocaleString()+
+  ' validated order records · '+lastScan.failed+' failed/unavailable regions · ESI snapshot '+new Date(lastScan.stamp).toLocaleString()+
+  ' · '+(filter==='npc'?'NPC-ONLY FILTER':'ALL PUBLIC (STRUCTURES FLAGGED)')+
+  '. Failed regions are not treated as empty markets.');
 }
 async function explore(){
  const button=$('marketExplorerGo');if(button.disabled)return;
- button.disabled=true;const token=++scanCount,stamp=Date.now();
- $('marketExplorerCharts').innerHTML='';
- $('marketExplorerTable').innerHTML='';
- $('marketItemHeadline').textContent='Loading selected market item…';
+ button.disabled=true;const token=++scanCount;
+ $('marketExplorerCharts').innerHTML='';$('marketExplorerTable').innerHTML='';
  $('marketBestBuy').textContent='—';$('marketBestSell').textContent='—';
+ $('marketItemHeadline').textContent='Reading ESI order books…';
  try{
-  const item=await itemFromSearch($('marketItemSearch').value);
-  const all=await regions();
-  const scope=$('marketExplorerScope').value;
-  const selected=scope==='hubs'?all.filter(x=>HUBS.has(x.id)):all;
-  if(!selected.length)throw Error('No supported regions were returned by ESI.');
-  const data=[];let errors=0,done=0;
-  notice('marketExplorerStatus','Querying '+selected.length+' public regional order books for '+item.name+'…');
-  await pool(selected.map(reg=>async()=>esi('/markets/'+reg.id+'/orders/?order_type=all&type_id='+item.id,{ttl:MARKET_TTL})),3,(i,orders,error)=>{
-   done++;if(error||!Array.isArray(orders))errors++;
-   else data.push(summarize(orders,selected[i]));
-   if(token===scanCount)notice('marketExplorerStatus','Regional price scan '+done+'/'+selected.length+
-    ' · '+errors+' unavailable or failed. Do not interpret incomplete coverage as a global best.');
+  getInputs();
+  const [item,all,local]=await Promise.all([
+   itemFromSearch($('marketItemSearch').value),regions(),localOperatingContext()
+  ]);
+  let selected=all;
+  if($('marketExplorerScope').value==='hubs')selected=all.filter(x=>HUBS.has(x.id));
+  if($('marketExplorerScope').value==='local'){
+   if(!local)throw Error('Operating system could not be resolved for the local region.');
+   selected=all.filter(x=>x.id===local.regionId);
+  }
+  if(!selected.length)throw Error('No public known-space market regions were returned for this scope.');
+  const delivery=await deliveryFromInputs(local);
+  const data=[];let errors=0,done=0,pages=0;
+  notice('marketExplorerStatus','Reading ESI order prices, volumes, ranges and locations across '+
+   selected.length+' public regions for '+item.name+'…');
+  await pool(selected.map(reg=>async()=>({reg,...await fetchCompleteOrders(reg,item.id)})),3,(_,response,error)=>{
+   done++;
+   if(error||!response)errors++;
+   else {data.push({...response.reg,orders:response.orders});pages+=response.pages;}
+   if(token===scanCount)notice('marketExplorerStatus','Exact order books '+done+'/'+selected.length+
+    ' regions · '+pages+' ESI pages · '+errors+' failed · an incomplete scan is never called global best.');
   });
   if(token!==scanCount)return;
-  if(!data.length)throw Error('No public region queries succeeded; no prices can be verified.');
-  await describeMarketLocations(data);
-  showResults(item,data,errors,selected.length,stamp);
+  if(!data.length)throw Error('No public regional order books could be validated; no best prices can be established.');
+  data.sort((a,b)=>a.name.localeCompare(b.name));
+  lastScan={item,regions:data,failed:errors,total:selected.length,pages,local,delivery,stamp:Date.now()};
+  auditPage=0;
+  const basic=data.map(x=>summarize(x.orders,x));
+  await describeOrders(basic);
+  for(const row of basic)for(const order of [row.ask,row.bid])if(order){
+   const source=data.find(x=>x.id===row.id)?.orders.find(x=>x.orderId===order.orderId);
+   if(source){source.systemName=order.systemName;source.stationName=order.stationName;}
+  }
+  auditOptions();renderResults();
  }catch(error){
-  if(token===scanCount)notice('marketExplorerStatus','Market explorer: '+error.message+' No prices were invented.');
+  if(token===scanCount){
+   notice('marketExplorerStatus','Market Explorer: '+error.message+' · no invalid or invented order prices displayed.');
+   $('marketItemHeadline').textContent='Order verification incomplete';
+  }
  }finally{button.disabled=false;}
 }
 function init(){
