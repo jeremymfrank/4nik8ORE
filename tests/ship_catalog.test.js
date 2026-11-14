@@ -10,7 +10,7 @@ const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
 const anchor='settingsManager.load().finally(()=>{shipInit();liveryInit();radioInit();miningInit();});';
 assert(app.includes(anchor),'App startup hook changed; update this regression test');
 const testApp=app.replace(anchor,
- 'window.__test={shipCatalogInit,shipInit,fetchShipCatalog,addShipFromCatalog,getLibrary:()=>shipLibrary,getCatalog:()=>shipCatalog,getSelections:()=>selectedShips};');
+ 'window.__test={shipCatalogInit,shipInit,fetchShipCatalog,addShipFromCatalog,catalogCsv,getLibrary:()=>shipLibrary,getCatalog:()=>shipCatalog,getSelections:()=>selectedShips};');
 const elements=new Map();
 function element(id){
  if(!elements.has(id))elements.set(id,{id,value:'',innerHTML:'',textContent:'',disabled:false,
@@ -21,7 +21,7 @@ function element(id){
 const document={getElementById:element,querySelectorAll(){return [];}};
 const store=new Map(),localStorage={getItem(k){return store.get(k)??null;},setItem(k,v){store.set(k,String(v));}};
 const known={
- category:{groups:[20,21]},
+ category:{category_id:6,name:'Ship',groups:[20,21]},
  mining:{category_id:6,group_id:20,name:'Mining Barge',published:true,types:[17480,17481]},
  industrial:{category_id:6,group_id:21,name:'Industrial',published:true,types:[649]},
  names:[{id:17480,name:'Retriever'},{id:17481,name:'Procurer'},{id:649,name:'Badger'}],
@@ -46,11 +46,16 @@ new Function('window','document','fetch','localStorage','setTimeout','clearTimeo
  class {abort(){}get signal(){return {};}}
 );
 (async()=>{
- win.__test.shipInit();
- assert.equal(win.__test.getLibrary().find(p=>p.id==='retriever').name,'Retriever');
  assert.equal(win.__test.getCatalog().length,0);
- await win.__test.fetchShipCatalog();
+ await win.__test.shipCatalogInit(); // ESI fetch starts automatically on first use.
+ win.__test.shipInit(); // On a cached startup, no additional category fetch occurs.
+ assert.equal(win.__test.getLibrary().find(p=>p.id==='retriever').name,'Retriever');
  assert.deepEqual(win.__test.getCatalog().map(s=>s.name),['Badger','Procurer','Retriever']);
+ const completeCsv=win.__test.catalogCsv();
+ assert(completeCsv.includes('"17481","Procurer","Mining Barge"'));
+ assert(completeCsv.includes('"649","Badger","Industrial"'));
+ assert.equal(completeCsv.trim().split(/\r?\n/).length,4);
+ assert.equal(element('shipCatalogExport').disabled,false);
  assert(store.has('4nik8.ship.catalog.v1'));
  assert(element('freightShipSelect').innerHTML.includes('catalog:17481'));
  const p=await win.__test.addShipFromCatalog(17481);
@@ -65,5 +70,5 @@ new Function('window','document','fetch','localStorage','setTimeout','clearTimeo
  assert.equal(win.__test.getSelections().trade,'manual');
  assert.equal(win.__test.getSelections().freight,'manual');
  assert(calls.some(url=>url.includes('/universe/categories/6')));
- console.log('PASS complete ESI ship category, searchable hulls, neutral defaults, hull attributes, independent selectors and catalog caching');
+ console.log('PASS auto ESI ship catalog, complete CSV export, neutral defaults, hull attributes, independent selectors and cached catalog');
 })().catch(error=>{console.error(error);process.exitCode=1;});
