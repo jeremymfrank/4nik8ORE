@@ -116,16 +116,17 @@
         <div class="section-name"><span class="ordinal">06</span> SHIP FITTING LIBRARY <span class="line"></span><span class="small-label">ONE LIBRARY / INDEPENDENT SECTION SHIPS</span></div>
         <p class="ship-note">Select a saved fit in each section above. Public ESI loads base hull attributes; recognized EFT modules and rigs adjust ordinary cargo, align and warp performance. Enter your actual fitted values to account for skills, implants, hull bonuses, or unsupported modules.</p>
         <div class="ship-catalog" aria-label="Search official EVE ship hull catalog">
-          <div class="ship-catalog-heading">ALL EVE SHIP HULLS · CCP ESI CATALOG</div>
+          <div class="ship-catalog-heading">EVE SHIP CATALOG · LIVE CCP ESI</div>
           <div class="ship-catalog-search">
             <label class="field"><span>FIND A SHIP HULL</span><input id="shipCatalogSearch" type="search" maxlength="80" autocomplete="off" placeholder="Search ships by hull or class, e.g. Porpoise, Orca, Jump Freighter"></label>
             <label class="field"><span>MATCHING HULLS</span><select id="shipCatalogResults" aria-label="Ship hull catalog results" disabled><option value="">Load EVE's catalog to search</option></select></label>
           </div>
           <div class="ship-catalog-actions">
-            <button type="button" id="shipCatalogLoad">LOAD / REFRESH SHIP CATALOG</button>
+            <button type="button" id="shipCatalogLoad">REFRESH FROM EVE ESI</button>
             <button type="button" id="shipCatalogAdd" disabled>ADD SELECTED HULL</button>
+            <button type="button" id="shipCatalogExport" disabled>EXPORT FULL LIST · CSV</button>
           </div>
-          <p id="shipCatalogStatus" class="ship-catalog-status" role="status">The catalog is loaded on request from public EVE ship-category data and cached locally. All sections can select any catalog hull after loading.</p>
+          <p id="shipCatalogStatus" class="ship-catalog-status" role="status">The full public ship-category catalog loads automatically from CCP ESI. It is cached locally; Refresh checks for new ship hulls. CSV export includes every retrieved hull, not just search matches.</p>
         </div>
         <div class="ship-editor-grid">
           <label class="field ship-wide"><span>EDIT SAVED SHIP PROFILE</span><select id="shipLibrarySelect" aria-label="Ship profile to edit"></select></label>
@@ -181,7 +182,7 @@
           <audio id="audioPlayer" preload="none"></audio>
         </div>
       </section>
-      <footer class="bottom"><span>4NIK8 ORE / INDUSTRIAL RECLAMATION</span><span class="version">PREVIEW v0.5.1 · LOCAL WINDOWS</span></footer>
+      <footer class="bottom"><span>4NIK8 ORE / INDUSTRIAL RECLAMATION</span><span class="version">PREVIEW v0.5.2 · LOCAL WINDOWS</span></footer>
     </main>
   </div>
   <script src="logic.js"></script>
