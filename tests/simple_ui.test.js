@@ -6,6 +6,7 @@ const root=path.join(__dirname,'..');
 const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
 const css=fs.readFileSync(path.join(root,'styles.css'),'utf8');
+const market=fs.readFileSync(path.join(root,'market_explorer.js'),'utf8');
 for(const id of ['shipQuickStats','shipCatalogSearch','shipCatalogResults','shipCatalogAdd',
  'shipLibrarySelect','shipFitAdvanced','shipManualBase','shipFetch','shipSave','shipImport',
  'marketAuditRegion','marketAuditTable','freightShipSelect','oreShipSelect','tradeShipSelect',
@@ -31,7 +32,7 @@ assert.equal((html.match(/<section\b/g)||[]).length,(html.match(/<\/section>/g)|
 assert(app.includes('function ensureHullAttributes('),'Ship data must hydrate without a manual button');
 assert(app.includes('function shipQuickSummary('));
 assert(app.includes('shipLibrary.push(p);shipMenus();'),'One-click imported EFT saves profile');
-assert(app.includes('loadCatalog(false).catch('),'Market catalog sync on first use without technical button');
+assert(market.includes('loadCatalog(false).catch('),'Market catalog sync on first use without technical button');
 assert(css.includes('.ship-stat-cards'));
 assert(css.includes('.freight-selected'));
 console.log('PASS v0.6.2 simple-mode layout: automatic hull data, no repeat banners, optional diagnostics, intact expert controls and responsive styles');
