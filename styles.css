@@ -360,3 +360,16 @@ iframe,video,img{max-width:100%}
 @media(prefers-reduced-motion:reduce){.op-card{transition:none}}
 
 @media(min-width:1400px) and (orientation:portrait){.frame{max-width:min(100%,1150px);padding:20px 25px}main{grid-template-columns:minmax(0,1fr);gap:16px}main>.panel,.bottom{grid-column:1!important}}
+
+
+/* v0.5.1: complete EVE ship catalogue search, no forced ship nicknames */
+.ship-catalog{border:1px solid var(--edge2);border-radius:6px;padding:12px;margin:2px 0 14px;background:linear-gradient(120deg,#17272c,#222029)}
+.ship-catalog-heading{font-size:11px;font-weight:900;letter-spacing:.8px;color:var(--amber);margin:0 0 10px}
+.ship-catalog-search{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+.ship-catalog-search input,.ship-catalog-search select{width:100%;min-width:0;min-height:40px;background:#101415;border:1px solid #57605b;border-radius:4px;color:#f1e5cb;padding:9px;font-size:12px}
+.ship-catalog-actions{display:flex;flex-wrap:wrap;gap:8px;margin:11px 0 5px}
+.ship-catalog-actions button{flex:1 1 170px;cursor:pointer;border:1px solid var(--amber2);border-radius:5px;background:#252b2e;color:#f3ca88;padding:10px;font-size:11px;font-weight:800;min-height:40px}
+.ship-catalog-actions button:disabled{opacity:.5;cursor:not-allowed}
+.ship-catalog-status{margin:7px 0 0;color:var(--muted);font-size:11px;line-height:1.55}
+input[type=search]{background:#101415;color:#f1e5cb;border:1px solid #57605b;border-radius:4px;outline-color:var(--amber)}
+@media(max-width:680px){.ship-catalog-search{grid-template-columns:1fr}}
