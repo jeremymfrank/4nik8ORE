@@ -343,11 +343,20 @@ function shipInit(){
    tradeStatus('Trade ship changed; rescan needed');
   }
  });
+ $('shipManualBase').addEventListener('click',()=>{
+  const fields=Object.values(SHIP_BASE_FIELDS);
+  const unlock=fields.every(id=>$(id).readOnly);
+  for(const id of fields)$(id).readOnly=!unlock;
+  $('shipManualBase').textContent=unlock?'LOCK BASE FIELDS':'ENABLE MANUAL BASE EDITING';
+  shipMessage(unlock?'EXPERT MODE · Base hull values are editable. Any change replaces the saved values only for this ship profile.':'Base hull fields locked.');
+ });
  $('shipNew').addEventListener('click',()=>{
-  $('shipLibrarySelect').value='';$('shipName').value='';$('shipHull').value='';
-  for(const id of Object.values(SHIP_BASE_FIELDS))$(id).value=0;
+  $('shipFitAdvanced').open=true;
+  $('shipLibrarySelect').value='';$('shipName').value='';$('shipHull').value='';$('shipHull').readOnly=false;
+  for(const id of Object.values(SHIP_BASE_FIELDS)){$(id).value=0;$(id).readOnly=false;}
   for(const id of ['shipCargoSkill','shipHoldSkill','shipExactCapacity','shipExactAlign','shipExactWarp','shipModules','shipEft'])$(id).value='';$('shipExactKind').value='general';
-  shipMessage('New fit: fill fields or import EFT, then save.');
+  shipQuickSummary(null);
+  shipMessage('Advanced manual hull. Enter an exact EVE hull name, then SAVE MY FIT. Normally, choose a ship from the catalog instead.');
  });
  $('shipSave').addEventListener('click',()=>{
   const current=shipLibrary.find(s=>s.id===$('shipLibrarySelect').value);
@@ -375,21 +384,29 @@ function shipInit(){
   for(const role of Object.keys(selectedShips))if(selectedShips[role]===id)selectedShips[role]='manual';
   shipMenus();showShipEditor();settingsManager.schedule();shipMessage('Deleted '+p.name+'.');
  });
- $('shipImport').addEventListener('click',()=>{
-  try{const fit=L.parseEftFit($('shipEft').value);
-   $('shipLibrarySelect').value=''; // imported fittings create a new profile, never overwrite the factory hull
-   for(const id of Object.values(SHIP_BASE_FIELDS))$(id).value=0;
-   for(const id of ['shipCargoSkill','shipHoldSkill','shipExactCapacity','shipExactAlign','shipExactWarp'])$(id).value='';
-   $('shipExactKind').value='general';
-   $('shipName').value=fit.name;$('shipHull').value=fit.hull;$('shipModules').value=fit.modules.join('\n');
-   shipMessage('EFT recognized '+fit.modules.length+' modifiers.'+(fit.unrecognized.length?' Unsupported: '+fit.unrecognized.slice(0,3).join(', '):'')+' Fetch ESI hull, verify fittings/skills, then SAVE.');
-  }catch(e){shipMessage('EFT import: '+e.message);}
+ $('shipImport').addEventListener('click',async()=>{
+  try{
+   const fit=L.parseEftFit($('shipEft').value);
+   if(shipLibrary.length>=128)throw Error('Maximum 128 saved fits. Remove an unused custom profile first.');
+   const mods=fit.modules.map(x=>String(x).toLowerCase());
+   const p={id:'fit-'+Date.now().toString(36),name:fit.name.slice(0,64),hull:fit.hull.slice(0,64),
+    base:{},modules:mods,cargoSkillPct:0,specialHoldSkillPct:0};
+   if(!validShip(p))throw Error('The imported fit contains unsupported modifiers or an invalid name');
+   shipMessage('Reading '+fit.hull+' hull data from ESI and saving the fit…');
+   await fetchHull(p);
+   shipLibrary.push(p);shipMenus();$('shipLibrarySelect').value=p.id;showShipEditor();
+   settingsManager.schedule();shipReadouts();
+   shipMessage('Imported & saved '+fit.name+'. '+fit.modules.length+' supported modifiers.'+
+    (fit.unrecognized.length?' '+fit.unrecognized.length+' unrecognized modifiers were NOT applied. Review the fit before relying on estimates.':'')+
+    ' Personal skill bonuses still need optional verification.');
+  }catch(err){shipMessage('Fit import not saved: '+err.message+'. Use the EVE fitting Copy to Clipboard format.');}
  });
  $('shipFetch').addEventListener('click',async()=>{
-  const hull=$('shipHull').value.trim();if(!hull){shipMessage('Enter hull name first.');return;}
-  shipMessage('Fetching '+hull+' base attributes from ESI…');
-  try{await fetchHull({hull,base:{}},true);shipMessage('Base attributes loaded. SAVE PROFILE to retain them.');}
-  catch(e){shipMessage('ESI hull data unavailable · '+e.message);}
+  const p=shipLibrary.find(s=>s.id===$('shipLibrarySelect').value);
+  if(!p){shipMessage('Choose a saved hull first.');return;}
+  failedShipHulls.delete(p.id);
+  shipMessage('Checking CCP ESI for '+p.hull+' base hull data…');
+  await ensureHullAttributes(p,true);
  });
 }
 
