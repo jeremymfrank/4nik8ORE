@@ -243,7 +243,9 @@ function miningSnapshot(){
 function miningKind(item){return RESOURCES.ice.includes(item.name)?'ice':'ore';}
 function miningMetric(item,v){
  if(!v||!v.estimate)return null;
- return L.miningPerformance(item,v,miningSnapshot(),freightInputs(),miningKind(item));
+ const kind=miningKind(item),c=freightInputs(kind,'ore');
+ const e=L.freightEstimate(v.quote,v.estimate.jumps,v.physicalUnitM3,item.volume,c);
+ return L.miningPerformance(item,{...v,estimate:e},miningSnapshot(),c,kind);
 }
 function bestHourlyBuyer(item){
  if(!Array.isArray(item?.variants))return null;
@@ -380,9 +382,11 @@ async function runScan(force=false){
 // Net rankings are only used when a verified stargate route is available.
 const routePromises=new Map();
 const systemDetails=new Map();
-function freightInputs(){
+function freightInputs(kind='ore',role='freight'){
  const read=(id,fallback,min,max)=>{const n=Number($(id).value);return Number.isFinite(n)?Math.max(min,Math.min(max,n)):fallback;};
- return {capacity:read('haulCapacity',31625,1,10000000),taxPct:read('haulTax',7.5,0,100),cashPerJump:read('haulCostJump',0,0,100000000),minutesPerJump:read('haulMinutesJump',2,0.1,120),pilotISKHour:read('haulTimeValue',0,0,1000000000),preference:$('haulRoutePref').value};
+ return {...shipOptions(role,kind),taxPct:read('haulTax',7.5,0,100),cashPerJump:read('haulCostJump',0,0,100000000),
+  minutesPerJump:read('haulMinutesJump',2,0.1,120),averageAU:read('haulAverageAU',20,.1,250),
+  pilotISKHour:read('haulTimeValue',0,0,1000000000),preference:$('haulRoutePref').value};
 }
 function routeLabel(value){return !value?'ROUTE UNVERIFIED':value.jumps+' JUMPS · '+value.preference.toUpperCase();}
 function routeKey(dest){return [state.system?.id,dest,freightInputs().preference].join(':');}
@@ -427,8 +431,8 @@ function candidateList(item){
  return result;
 }
 function repriceFreight(){
- const c=freightInputs();
  for(const item of state.results){
+  const c=freightInputs(miningKind(item),'freight');
   if(!item.variants)continue;
   for(const v of item.variants){
    const key=routeKey(v.quote.systemId),route=state.routeEstimates?.get(key);
@@ -484,7 +488,7 @@ function selectItem(name){
 }
 async function renderFreight(item,token){
  const container=$('haulDetails');
- const c=freightInputs(),routeCount=state.routeEstimates?.size||0;
+ const c=freightInputs(miningKind(item),'freight'),routeCount=state.routeEstimates?.size||0;
  const variants=candidateList(item);
  const enriched=variants.map(v=>({...v,estimate:v.estimate||null})).sort((a,b)=>{
   const status=v=>v.estimate?(v.quote.full?4:2):(v.quote.full?3:1);
@@ -502,7 +506,7 @@ async function renderFreight(item,token){
   return `<div class="freight-destination ${i===0?'best':''}"><div class="freight-destination-top"><div><span class="freight-rank">${i+1}</span><b>${location}</b><span class="freight-region">${safe(reg)} · ${v.form.toUpperCase()}</span></div>${net}</div><div class="freight-destination-bottom"><span>${e?routeLabel({jumps:e.jumps,preference:c.preference}):'Route unavailable'} · ${e?e.trips+' trip'+(e.trips===1?'':'s'):'—'}</span><span>GROSS ${L.formatIsk(q.gross)} ISK · ${q.full?'FULL LOAD':'PARTIAL '+Math.round(q.coverage*100)+'%'}</span></div></div>`;
  }).join('');
  const costs=primary.estimate?`<div class="freight-costs"><div><span>Taxes (${c.taxPct}%)</span><strong>−${L.formatIsk(primary.estimate.salesTax)} ISK</strong></div><div><span>Transport allowance</span><strong>−${L.formatIsk(primary.estimate.haulCashCost)} ISK</strong></div><div><span>Pilot time allowance</span><strong>−${L.formatIsk(primary.estimate.timeCost)} ISK</strong></div><div><span>Est. travel (outbound + returns)</span><strong>${L.formatIsk(primary.estimate.travelMinutes)} min</strong></div><div><span>Transport volume</span><strong>${L.formatIsk(primary.estimate.shippedM3,2)} m³</strong></div></div>`:'';
- container.innerHTML=intro+`<div class="freight-cost-caption">ESTIMATED FREIGHT · ${c.taxPct}% TAX · ${L.formatIsk(c.cashPerJump)} ISK / JUMP · ${L.formatIsk(c.capacity)} m³ HOLD · ${routeCount} KNOWN ROUTES</div><div class="freight-destinations">${rows}</div>`+costs+`<p class="muted tiny freight-disclaimer">Estimates exclude compression fees, losses, docking restrictions, taxes other than configured sales tax and PvP risk. Partial orders cannot buy the whole load. Routes are stargate only. Current mining-site availability is not known from ESI. If routes failed, these destinations are unranked by net value.</p>`;
+ container.innerHTML=intro+`<div class="freight-cost-caption">ESTIMATED FREIGHT · ${c.taxPct}% TAX · ${L.formatIsk(c.cashPerJump)} ISK / JUMP · ${L.formatIsk(c.capacity)} m³ HOLD · ${c.ship?'SHIP MODEL · ASSUMED '+c.averageAU+' AU/GATE':'MANUAL MIN/JUMP'} · ${routeCount} KNOWN ROUTES</div><div class="freight-destinations">${rows}</div>`+costs+`<p class="muted tiny freight-disclaimer">Estimates exclude compression fees, losses, docking restrictions, taxes other than configured sales tax and PvP risk. Partial orders cannot buy the whole load. Routes are stargate only. Current mining-site availability is not known from ESI. If routes failed, these destinations are unranked by net value.</p>`;
  // Resolve human-readable NPC station names automatically without changing the price ranking.
  await pool(enriched.slice(0,12).map(v=>async()=>({id:v.quote.locationId,station:await buyerStation(v.quote.locationId,v.quote.systemId)})),4,(_,data)=>{
   if(token!==state.routeToken||!data||!container.isConnected)return;
@@ -843,7 +847,7 @@ Array.from(document.querySelectorAll('[data-resource]')).forEach(b=>b.addEventLi
 }));
 $('scanForm').addEventListener('submit',e=>{e.preventDefault();settingsManager.schedule();runScan(false);});
 ['systemInput','hubSelect','cargoVolume'].forEach(id=>$(id).addEventListener('change',()=>settingsManager.schedule()));
-['haulCapacity','haulTax','haulCostJump','haulMinutesJump','haulTimeValue'].forEach(id=>$(id).addEventListener('change',()=>{
+['haulCapacity','haulTax','haulCostJump','haulMinutesJump','haulAverageAU','haulTimeValue'].forEach(id=>$(id).addEventListener('change',()=>{
  settingsManager.schedule();if(state.results.length){repriceFreight();drawRows();const item=state.results.find(x=>x.name===state.selected);if(item)selectItem(item.name);}
 }));
 $('haulRoutePref').addEventListener('change',()=>{settingsManager.schedule();if(state.results.length)runRoutesOnly();});
@@ -866,7 +870,7 @@ function tradeSettings(){
  const handling=Math.max(.1,Math.min(10000,Number($('tradeHandling').value)||10));
  return {budget,handling,items:tradeNames().slice(0,16).join(', '),sort:$('tradeSort').value,returnHome:$('tradeReturn').checked};
 }
-function tradeOptions(){const h=freightInputs(),t=tradeSettings();return {...t,capacity:h.capacity,taxPct:h.taxPct,preference:h.preference,minutesPerJump:h.minutesPerJump,cashPerJump:h.cashPerJump};}
+function tradeOptions(){const h=freightInputs('general','trade'),t=tradeSettings();return {...t,...h};}
 function tradeStatus(text){$('tradeStatus').textContent=text;}
 // Bounded station shortlists represent best prices AND meaningful bulk depth.
 function topTradeBooks(groups,side){
@@ -896,7 +900,7 @@ function tradeEstimate(quote,jumpPickup,jumpLoaded,jumpHome,opts){
  const jumps=jumpPickup+jumpLoaded+jumpHome;
  const freightCost=jumps*opts.cashPerJump;
  const profit=quote.cashProfit-freightCost;
- const minutes=jumps*opts.minutesPerJump+opts.handling;
+ const minutes=L.shipTravelMinutes(jumpPickup,opts)+L.shipTravelMinutes(jumpLoaded,opts)+(jumpHome?L.shipTravelMinutes(jumpHome,opts):0)+opts.handling;
  if(!(profit>0&&minutes>0))return null;
  return {...quote,profit,jumps,jumpPickup,jumpLoaded,jumpHome,
   freightCost,minutes,iskHour:profit*60/minutes,roi:100*profit/quote.cost};
@@ -925,8 +929,10 @@ function candidateTradeRuns(types,regions,books,options){
   }
   const candidate=[];
   for(const source of sells)for(const dest of buys){
-   const quote=L.tradeQuote(source,dest,{...options,unitVolume:item.volume});
-   if(quote)candidate.push({item,source,dest,quote});
+   const kind=TRADE_PRESETS.minerals.includes(item.name)?'mineral':'general';
+   const haul=freightInputs(kind,'trade');
+   const quote=L.tradeQuote(source,dest,{...options,...haul,unitVolume:item.volume});
+   if(quote)candidate.push({item,source,dest,quote,haul});
   }
   candidate.sort((a,b)=>b.quote.cashProfit-a.quote.cashProfit);
   results.push(...candidate.slice(0,4));
@@ -992,7 +998,7 @@ async function scanTrade(){
    const first=await tradeRoute(origin.id,c.quote.sourceSystem,opts.preference);
    const loaded=await tradeRoute(c.quote.sourceSystem,c.quote.destSystem,opts.preference);
    const home=opts.returnHome?await tradeRoute(c.quote.destSystem,origin.id,opts.preference):0;
-   return {...c,estimate:tradeEstimate(c.quote,first,loaded,home,opts)};
+   return {...c,estimate:tradeEstimate(c.quote,first,loaded,home,{...opts,...c.haul})};
   });
   const done=[];let completed=0,routeFailures=0;
   await pool(routeWork,4,(_,result,error)=>{
@@ -1026,7 +1032,7 @@ const settingsManager=(()=>{
   const n=Number(readLocal(keys.volume,'55'));
   return {schemaVersion:1,livery:readLocal(keys.livery,'neon'),
    radio:{volume:Number.isFinite(n)?Math.max(0,Math.min(100,n)):55,shuffle:readLocal(keys.shuffle,'0')==='1',channels:channels.slice(0,40),selectedChannelId:readLocal(keys.last,'')},
-   scanner:{system:$('systemInput').value.trim(),hub:$('hubSelect').value,resource:state.resource,cargo:Math.max(1,Math.trunc(+$('cargoVolume').value||31625))},haul:freightInputs(),mining:miningSnapshot(),trade:tradeSettings()};
+   scanner:{system:$('systemInput').value.trim(),hub:$('hubSelect').value,resource:state.resource,cargo:Math.max(1,Math.trunc(+$('cargoVolume').value||31625))},haul:{...freightInputs(),capacity:Math.max(1,+$('haulCapacity').value||31625)},mining:miningSnapshot(),trade:tradeSettings(),ships:{library:shipLibrary,selections:selectedShips}};
  }
  function apply(data){
   if(!data||data.schemaVersion!==1)return;
@@ -1038,7 +1044,7 @@ const settingsManager=(()=>{
    if(typeof data.radio?.selectedChannelId==='string')localStorage.setItem(keys.last,data.radio.selectedChannelId);
   }catch(_){}
   const haul=data.haul||{};
-  for(const [id,key,min,max] of [['haulCapacity','capacity',1,10000000],['haulTax','taxPct',0,100],['haulCostJump','cashPerJump',0,100000000],['haulMinutesJump','minutesPerJump',0.1,120],['haulTimeValue','pilotISKHour',0,1000000000]]){
+  for(const [id,key,min,max] of [['haulCapacity','capacity',1,10000000],['haulTax','taxPct',0,100],['haulCostJump','cashPerJump',0,100000000],['haulMinutesJump','minutesPerJump',0.1,120],['haulAverageAU','averageAU',0.1,250],['haulTimeValue','pilotISKHour',0,1000000000]]){
    if(haul[key]!==undefined&&Number.isFinite(+haul[key])&&+haul[key]>=min&&+haul[key]<=max)$(id).value=haul[key];
   }
   if(['Safer','Shorter','LessSecure'].includes(haul.preference))$('haulRoutePref').value=haul.preference;
@@ -1053,6 +1059,10 @@ const settingsManager=(()=>{
   for(const [key,field] of [['observedOreM3Hour','ore'],['observedIceM3Hour','ice']]){const v=mine[key];miningObserved[field]=(v!==null&&v!==undefined&&Number.isFinite(+v)&&+v>0)?+v:null;}
   if(mine.session && ['ore','ice'].includes(mine.session.kind) && Number.isFinite(+mine.session.startedAt) && mine.session.startedAt>0 && mine.session.startedAt<=Date.now())miningSession={kind:mine.session.kind,startedAt:+mine.session.startedAt};
   else miningSession=null;
+  const savedShips=data.ships||{};
+  if(Array.isArray(savedShips.library)&&savedShips.library.length<=32&&savedShips.library.every(p=>p&&Array.isArray(p.modules)&&validShip(p)))shipLibrary=savedShips.library.map(p=>({...p,base:{...p.base},modules:[...p.modules]}));
+  for(const role of Object.keys(selectedShips))if(typeof savedShips.selections?.[role]==='string')selectedShips[role]=savedShips.selections[role];
+  shipMenus();
   const savedTrade=data.trade||{};
   if(Number.isFinite(+savedTrade.budget)&&+savedTrade.budget>=1&&+savedTrade.budget<=1e12)$('tradeBudget').value=+savedTrade.budget;
   if(Number.isFinite(+savedTrade.handling)&&+savedTrade.handling>=.1&&+savedTrade.handling<=10000)$('tradeHandling').value=+savedTrade.handling;
@@ -1141,5 +1151,5 @@ function liveryInit(){
  picker.addEventListener('change',()=>apply(picker.value));
  apply(chosen);
 }
-settingsManager.load().finally(()=>{liveryInit();radioInit();miningInit();});
+settingsManager.load().finally(()=>{shipInit();liveryInit();radioInit();miningInit();});
 })();
