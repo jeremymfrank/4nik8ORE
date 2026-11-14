@@ -122,7 +122,7 @@
       <section class="market-explorer panel" id="marketExplorerPanel">
         <div class="section-name"><span class="ordinal">06</span> NEW EDEN MARKET EXPLORER <span class="line"></span><span class="small-label">ALL MARKET ITEMS / EVERY PUBLIC REGION</span></div>
         <p class="trade-intro">Search any EVE market-listed item, not just ore. The catalog comes from all ESI market groups. Compare the cheapest listed seller (where to buy) and the highest public buy order (where to sell) across regions.</p>
-        <div class="market-catalog-actions"><button type="button" id="marketCatalogSync">SYNC ALL MARKET ITEMS FROM ESI</button><span id="marketCatalogSummary" role="status">Full market item index not yet loaded. Search an exact item name now, or sync for suggestions.</span></div>
+        <div class="market-catalog-actions"><button type="button" id="marketCatalogSync">SYNC ALL MARKET ITEMS FROM ESI</button><button type="button" id="marketCatalogExport" disabled>EXPORT COMPLETE ITEM LIST · CSV</button><span id="marketCatalogSummary" role="status">Full market item index not yet loaded. Search an exact item name now, or sync for suggestions.</span></div>
         <form id="marketExplorerForm">
           <div class="market-explorer-fields">
             <label class="field"><span>ITEM NAME OR EVE TYPE ID</span><input type="search" id="marketItemSearch" list="marketCatalogSuggest" placeholder="e.g. Tritanium, Veldspar, PLEX, Warp Scrambler II" autocomplete="off" required><datalist id="marketCatalogSuggest"></datalist></label>
