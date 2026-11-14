@@ -129,8 +129,9 @@ async function loadCatalog(force=false){
    const ids=await esi('/markets/groups/',{ttl:DAY,force});
    if(!Array.isArray(ids)||ids.length<1||ids.length>12000)throw Error('Unexpected market groups index');
    await pool(ids.map(id=>async()=>esi('/markets/groups/'+id+'/',{ttl:DAY,force})),5,(_,data,error)=>{
-    done++;if(error||!data||!Number.isInteger(+data.market_group_id)||!Array.isArray(data.types))failed++;
-    else groups.push(data);
+    done++;if(error||!data||!Number.isInteger(+data.market_group_id)||typeof data.name!=='string'||
+      (data.types!==undefined&&!Array.isArray(data.types)))failed++;
+    else groups.push({...data,types:data.types||[]});
     if(done%5===0||done===ids.length)notice('marketCatalogSummary','Fetching market groups '+done+'/'+ids.length+
      (failed?' · '+failed+' failed':'')+'. ESI limits may make the first sync lengthy.');
    });
