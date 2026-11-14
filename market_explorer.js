@@ -61,13 +61,18 @@ function pathFor(group,groups){
 }
 function familyOf(item){
  const path=String(item?.path||'').toLowerCase();
+ const group=String(item?.group||'').toLowerCase();
  const name=String(item?.name||'').toLowerCase();
- if(name.startsWith('compressed '))return '';
- if(/\bice products?\b/.test(path))return '';
+ // EVE explicitly lists compressed, batch-compressed and processed products
+ // alongside their mineable originals. They must NOT inherit mining yields.
+ if(/\bcompressed\b/.test(name)||/\bcompressed\b/.test(path)||
+  /\bbatch\b/.test(name)||/\breprocessed\b|\brefined\b|\breactions?\b|\bprocessed\b/.test(path))return '';
+ if(/\bice products?\b|\bmoon materials?\b|\bminerals?\b|\bmoon goo\b/.test(path))return '';
  if(/\bmoon ores?\b/.test(path))return 'moon';
- if(/\basteroid ores?\b|\bcompressed ores?\b|\bores?\b/.test(path)&&!/\bmodules?\b/.test(path))return 'ore';
+ if(/\basteroid ores?\b|\bstandard ores?\b|\bmining ores?\b/.test(path)||
+  (/\bores?\b/.test(path)&&!/\bmodules?\b|\bmaterials?\b/.test(path)))return 'ore';
  if(/\bice\b/.test(path)&&!/\bice products?\b/.test(path))return 'ice';
- if(/\bgas clouds?\b|\bharvestable gas\b/.test(path))return 'gas';
+ if(/\bgas clouds?\b|\bharvestable gas\b|\bgas harvesting\b/.test(path))return 'gas';
  return '';
 }
 function resourceItems(mode='both'){
@@ -78,7 +83,7 @@ function resourceItems(mode='both'){
 }
 function compressedFor(item){
  const name=item?.name||'';
- return catalog.find(s=>s.name.toLowerCase()==='compressed '+name.toLowerCase())||null;
+ return catalog.find(s=>s.name.toLowerCase()==='compressed '+name.toLowerCase()||s.name.toLowerCase()==='batch compressed '+name.toLowerCase())||null;
 }
 async function resolveNames(ids){
  const found=[];
