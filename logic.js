@@ -213,7 +213,8 @@ api.shipStats=function(profile,cargoKind='general'){
  const mineral=(Number(base.mineral)||0)*(1+(Number(profile.specialHoldSkillPct)||0)/100);
  const fleet=Number(base.fleet)||0;
  const kind=cargoKind==='ore'||cargoKind==='ice'?'mining':cargoKind==='mineral'?'mineral':'general';
- const capacity=Number(profile.exactCapacity)>0?Number(profile.exactCapacity):
+ const useExact=Number(profile.exactCapacity)>0 && (profile.exactCapacityKind||'general')===kind;
+ const capacity=useExact?Number(profile.exactCapacity):
   general+fleet+(kind==='mining'?mining:kind==='mineral'?mineral:0);
  const mass=Number(base.mass)||0,inertia=Number(base.inertia)||0;
  const computedAlign=mass>0&&inertia>0?Math.log(4)*mass*inertia/1e6*stack('inertia'):null;
@@ -221,7 +222,7 @@ api.shipStats=function(profile,cargoKind='general'){
  const align=Number(profile.exactAlign)>0?Number(profile.exactAlign):computedAlign;
  const warp=Number(profile.exactWarp)>0?Number(profile.exactWarp):computedWarp;
  return {capacity:capacity>0?capacity:null,align:align>0?align:null,warp:warp>0?warp:null,
-  general,mining,mineral,fleet,kind,source:Number(profile.exactCapacity)>0?'measured':base.general>0?'ESI hull / fit':'unconfigured'};
+  general,mining,mineral,fleet,kind,source:useExact?'measured':base.general>0?'ESI hull / fit':'unconfigured'};
 };
 // Warp acceleration/cruise/deceleration model; distance in AU, speed in AU/s.
 api.warpSeconds=function(distanceAU,warpAU,maxSubwarp=200){
