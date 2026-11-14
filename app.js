@@ -284,13 +284,35 @@ function bestHourlyBuyer(item){
  }
  return best;
 }
-function effectiveBuyer(item){return $('miningSort').value==='hour'?(bestHourlyBuyer(item)||item.winner):item.winner;}
+function oreProfitEstimate(item,variant){
+ if(!variant?.estimate)return null;
+ return L.freightEstimate(variant.quote,variant.estimate.jumps,variant.physicalUnitM3,item.volume,freightInputs(miningKind(item),'ore'));
+}
+function bestOreBuyer(item){
+ if(!Array.isArray(item?.variants))return item?.winner||null;
+ let best=null,bestScore=-Infinity;
+ for(const v of item.variants){
+  const e=oreProfitEstimate(item,v);
+  if(!e)continue;
+  // Never let a partially covered order win over a fully executable one.
+  const score=(v.quote.full?1e20:0)+e.net;
+  if(score>bestScore){best=v;bestScore=score;}
+ }
+ return best||item.winner;
+}
+function effectiveBuyer(item){return $('miningSort').value==='hour'?(bestHourlyBuyer(item)||bestOreBuyer(item)):bestOreBuyer(item);}
+
 function visibleOpportunities(){
  const a=state.results.slice();
  if($('miningSort').value==='hour')a.sort((x,y)=>{
   const bx=bestHourlyBuyer(x),by=bestHourlyBuyer(y);
   const mx=bx&&miningMetric(x,bx),my=by&&miningMetric(y,by);
   return Number(!!my)-Number(!!mx) || (my?.allInIskHour??0)-(mx?.allInIskHour??0);
+ });
+ else a.sort((x,y)=>{
+  const bx=bestOreBuyer(x),by=bestOreBuyer(y),vx=bx&&oreProfitEstimate(x,bx),vy=by&&oreProfitEstimate(y,by);
+  return Number(!!by)-Number(!!bx)||Number(!!by?.quote.full)-Number(!!bx?.quote.full)||
+   (vy?.net??by?.quote.gross??0)-(vx?.net??bx?.quote.gross??0);
  });
  return a;
 }
@@ -353,10 +375,10 @@ function drawRows(){
  el.innerHTML=displayed.map((item,idx)=>{
   if(!item.winner)return `<div class="op-card"><div class="rank">·</div><div class="op-main"><div class="op-name">${L.escape(item.name)}</div><div class="op-sub">${L.escape(item.error||'No executable public buy orders found for this sample load')}</div></div><div class="op-price"><strong>—</strong></div></div>`;
   ranking++;
-  const w=effectiveBuyer(item), full=w.quote.full, mark=w.form==='compressed'?'COMPRESSED':'RAW',v=w.estimate? w.estimate.net/item.volume : w.quote.perM3;
+  const w=effectiveBuyer(item), full=w.quote.full, mark=w.form==='compressed'?'COMPRESSED':'RAW',oreNet=oreProfitEstimate(item,w),v=oreNet?oreNet.net/item.volume:w.quote.perM3;
   const performance=$('miningSort').value==='hour'?miningMetric(item,w):null;
   const metricValue=$('miningSort').value==='hour'?(performance?L.formatIsk(performance.allInIskHour,0):'—'):bestPriceDisplay(v);
-  const metricUnit=$('miningSort').value==='hour'?(performance?'ISK/hour · all-in est.':'Yield / route unknown'):(w.estimate?'ISK/m³ · est. net':'ISK/m³ · gross (unrouted)');
+  const metricUnit=$('miningSort').value==='hour'?(performance?'ISK/hour · all-in est.':'Yield / route unknown'):(oreNet?'ISK/m³ · est. net':'ISK/m³ · gross (unrouted)');
   return `<div class="op-card ${state.selected===item.name?'selected':''}" data-item="${L.escape(item.name)}" role="button" tabindex="0" aria-label="Inspect ${L.escape(item.name)}"><div class="rank">${ranking}</div><div class="op-main"><div class="op-name">${L.escape(item.name)}</div><div class="op-sub">${mark} · ${L.escape(MARKETS[w.region]||state.system.regionName||'Other region')}${full?' · FULL LOAD':' · PARTIAL '+Math.round(w.quote.coverage*100)+'%'}</div></div><div class="op-price"><strong class="${full?'':'limited'}">${metricValue}</strong><small>${metricUnit}</small></div></div>`;
  }).join('');
  el.querySelectorAll('[data-item]').forEach(node=>{const callback=()=>selectItem(node.dataset.item);node.addEventListener('click',callback);node.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();callback();}});});
@@ -364,8 +386,8 @@ function drawRows(){
  const leader=hourly?displayed.find(x=>bestHourlyBuyer(x)):displayed.find(x=>x.winner);
  const lw=leader?effectiveBuyer(leader):null;
  $('bestName').textContent=leader?.name||(hourly?'Calibrate ship yield':'No visible buy orders');
- $('bestPrice').textContent=leader?(hourly?L.formatIsk(miningMetric(leader,lw).allInIskHour):bestPriceDisplay(lw.estimate?lw.estimate.net/leader.volume:lw.quote.perM3)):'—';
- $('headlineUnit').textContent=hourly?'ISK / HOUR · ALL-IN EST.':leader?.winner?.estimate?'ISK / mined m³ · EST. NET':'ISK / mined m³ · GROSS';
+ $('bestPrice').textContent=leader?(hourly?L.formatIsk(miningMetric(leader,lw).allInIskHour):bestPriceDisplay(oreProfitEstimate(leader,lw)?.net/leader.volume||lw.quote.perM3)):'—';
+ $('headlineUnit').textContent=hourly?'ISK / HOUR · ALL-IN EST.':leader&&oreProfitEstimate(leader,lw)?'ISK / mined m³ · EST. NET':'ISK / mined m³ · GROSS';
  $('dataFootnote').textContent=leader?'Order books are live; net estimates subtract user-defined sales tax and freight costs where ESI stargate routes were verified. No PvP risk, compression fees or mining site availability included.':'No executable public buy orders for the selected sample load. Private structure orders are not included.';
 }
 async function runScan(force=false){
