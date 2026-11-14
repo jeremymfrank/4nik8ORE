@@ -605,6 +605,10 @@ function init(){
  for(const id of ['marketExplorerScope','marketDeliveryStation'])$(id).addEventListener('change',()=>{
   if(lastScan)notice('marketExplorerStatus','Region scope or delivery station changed. Run FIND BEST BUY & SELL ORDERS again to refresh order range eligibility.');
  });
+ // Market item index is local-first. On the first run, or after expiry, update in
+ // the background without asking the pilot to press a technical SYNC button.
+ if(!catalog.length||Date.now()-catalogFetched>=7*DAY)
+  loadCatalog(false).catch(err=>notice('marketCatalogSummary','Market item catalog offline · '+err.message+' · Exact item search remains available.'));
 }
 global.ICMarketExplorer={loadCatalog,catalogItems,resourceItems,compressedFor,catalogState,itemFromSearch,
  regions,summarize,getOrders,init,explore,familyOf,esi,marketGroupCount:itemCount};
