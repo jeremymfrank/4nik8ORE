@@ -38,6 +38,10 @@ function seedDefaultSelection(){
 }
 function onCatalogLoaded(){seedDefaultSelection();render();}
 function setMode(value){mode=value;render();}
+function restore(ids){
+ if(!Array.isArray(ids)||ids.length>MAX_SELECTED||ids.some(x=>!Number.isInteger(x)||x<=0))return;
+ selected=new Set(ids);firstLaunch=false;save();render();
+}
 function init(currentMode='both'){
  mode=currentMode;
  firstLaunch=localStorage.getItem(KEY)===null;
@@ -98,5 +102,5 @@ async function loadResources(resource,force=false){
  }));
  return found;
 }
-global.ICResourceBrowser={init,setMode,loadResources,family,render,selected:()=>[...selected]};
+global.ICResourceBrowser={init,setMode,restore,loadResources,family,render,selected:()=>[...selected]};
 })(window);
