@@ -11,6 +11,7 @@ $backupFile = Join-Path $dataRoot 'settings.json.bak'
 $types = @{
   '/'='text/html; charset=utf-8'; '/index.html'='text/html; charset=utf-8';
   '/app.js'='text/javascript; charset=utf-8'; '/logic.js'='text/javascript; charset=utf-8';
+  '/market_accuracy.js'='text/javascript; charset=utf-8';
   '/market_explorer.js'='text/javascript; charset=utf-8'; '/resource_catalog.js'='text/javascript; charset=utf-8';
   '/styles.css'='text/css; charset=utf-8'; '/assets/4nik8-banner.webp'='image/webp'; '/assets/4nik8-corp-emblem.png'='image/png'
 }
