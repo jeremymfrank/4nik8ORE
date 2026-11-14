@@ -574,6 +574,7 @@ async function runScan(force=false){
  const systemName=$('systemInput').value.trim();if(!systemName)return;
  state.inProgress=true;const current=++state.runId;state.results=[];state.selected=null;state.hub=$('hubSelect').value;state.failed=0;state.routeToken++;
  $('scanButton').disabled=true;$('refreshButton').disabled=true;setStatus('','CONNECTING');
+ $('notice').textContent='Running a new resource scan. Live ESI public orders only; locations, range and docking access may require verification.';
  $('opportunities').innerHTML='<div class="placeholder"><span class="reticle">◎</span><strong>SEARCHING NEW EDEN</strong><p>Resolving location and resource types through ESI…</p></div>';
  $('bestName').textContent='Scanning orders…';$('bestPrice').textContent='—';
  $('haulDetails').innerHTML='<p class="muted">Market comparison in progress.</p>';
@@ -1070,9 +1071,19 @@ function radioInit(){
  });
  renderChannels();nowPlaying();status('Ready. Tune a saved channel or load local music.');
 }
+function markResourceSelectionStale(){
+ if(!state.results.length)return;
+ $('notice').textContent='RESOURCE SETTINGS CHANGED · The Opportunity Board still shows the previous completed scan. Click SCAN MARKETS to update prices for your new selection.';
+ $('dataFootnote').textContent='STALE SCAN · Current resource selection differs from the displayed results. This is not a new live market quote.';
+}
+window.addEventListener('ic-resource-selection-changed',()=>{
+ settingsManager.schedule();
+ markResourceSelectionStale();
+});
 Array.from(document.querySelectorAll('[data-resource]')).forEach(b=>b.addEventListener('click',()=>{
  state.resource=b.dataset.resource;
   window.ICResourceBrowser.setMode(state.resource);
+  markResourceSelectionStale();
  settingsManager.schedule();
  document.querySelectorAll('[data-resource]').forEach(x=>{const active=x===b;x.classList.toggle('active',active);x.setAttribute('aria-pressed',String(active));});
 }));
