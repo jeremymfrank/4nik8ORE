@@ -31,10 +31,12 @@
             <div class="resource-picker-heading">EVE RESOURCE CATALOG · ALL TYPES FROM ESI</div>
             <label class="field"><span>FIND ORE, MOON ORE, ICE OR GAS (NAME / VARIANT)</span><input type="search" id="resourceFilter" placeholder="e.g. Mercoxit, Glare Crust, Cobaltite" autocomplete="off"></label>
             <select id="resourcePick" multiple size="5" aria-label="Resource types to price. Hold Ctrl to select multiple"><option value="">Load the full ESI market catalog to select mineable resources</option></select>
-            <div class="resource-picker-buttons"><button type="button" id="resourceCatalogLoad">LOAD / UPDATE RESOURCE CATALOG</button><button type="button" id="resourcePickMatches">SELECT MATCHING (MAX 12)</button><button type="button" id="resourcePickClear">CLEAR SELECTION</button></div>
+            <div class="resource-picker-buttons"><button type="button" id="resourcePickMatches">SELECT MATCHING (MAX 12)</button><button type="button" id="resourcePickClear">CLEAR SELECTION</button></div>
+            <details class="resource-maintenance"><summary>RESOURCE CATALOG MAINTENANCE</summary><button type="button" id="resourceCatalogLoad">RELOAD RESOURCE TYPES FROM ESI</button></details>
             <div id="resourceCatalogStatus" class="resource-catalog-status" role="status">Select up to 12 resource variants per price scan. The full market item catalog is shared with the Market Explorer below.</div>
           </div>
-          <div class="scan-actions"><button id="scanButton" class="primary" type="submit"><span aria-hidden="true">◎</span> SCAN MARKETS</button><button id="refreshButton" type="button" class="ghost" title="Refresh cached market data" disabled>↻ REFRESH</button></div>
+          <div class="scan-actions"><button id="scanButton" class="primary" type="submit"><span aria-hidden="true">◎</span> SCAN MARKETS</button></div>
+          <details class="scan-maintenance"><summary>ADVANCED · FORCE RECHECK UNCACHED MARKET ORDERS</summary><button id="refreshButton" type="button" class="ghost" title="Force refresh ESI data" disabled>FORCE REFRESH FROM ESI</button></details>
         </form>
         <div class="location-summary" id="locationSummary" aria-live="polite"><span>Set a system and run the first scan.</span></div>
       </section>
@@ -122,7 +124,8 @@
       <section class="market-explorer panel" id="marketExplorerPanel">
         <div class="section-name"><span class="ordinal">06</span> NEW EDEN MARKET EXPLORER <span class="line"></span><span class="small-label">ALL MARKET ITEMS / EVERY PUBLIC REGION</span></div>
         <p class="trade-intro">Search any EVE market-listed item, not just ore. The catalog comes from all ESI market groups. Compare the cheapest listed seller (where to buy) and the highest public buy order (where to sell) across regions.</p>
-        <div class="market-catalog-actions"><button type="button" id="marketCatalogSync">SYNC ALL MARKET ITEMS FROM ESI</button><button type="button" id="marketCatalogExport" disabled>EXPORT COMPLETE ITEM LIST · CSV</button><span id="marketCatalogSummary" role="status">Full market item index not yet loaded. Search an exact item name now, or sync for suggestions.</span></div>
+        <div class="market-catalog-actions"><span id="marketCatalogSummary" role="status">Checking saved EVE market catalog. Search any item; prices are fetched when requested.</span></div>
+        <details class="market-catalog-maintenance"><summary>MARKET CATALOG MAINTENANCE <span>OPTIONAL · AUTOCACHED</span></summary><div class="market-catalog-actions"><button type="button" id="marketCatalogSync">RELOAD EVE ITEM CATALOG</button><button type="button" id="marketCatalogExport" disabled>EXPORT COMPLETE ITEM LIST · CSV</button></div></details>
         <form id="marketExplorerForm">
           <div class="market-explorer-fields">
             <label class="field"><span>ITEM NAME OR EVE TYPE ID</span><input type="search" id="marketItemSearch" list="marketCatalogSuggest" placeholder="e.g. Tritanium, Veldspar, PLEX, Warp Scrambler II" autocomplete="off" required><datalist id="marketCatalogSuggest"></datalist></label>
@@ -243,9 +246,10 @@
             </form>
           </div>
           <div class="youtube-shell" id="youtubeShell" hidden>
-            <div class="youtube-shell-header"><strong>CH <span id="youtubeChannelNumber">19</span> · OFFICIAL YOUTUBE PLAYER</strong><div class="youtube-shell-actions"><button type="button" id="testYouTubeEmbed" title="Check if a YouTube sample video can play inside this dashboard">TEST EMBED</button><button type="button" id="stopYouTube">■ OFF AIR</button></div></div>
+            <div class="youtube-shell-header"><strong>CH <span id="youtubeChannelNumber">19</span> · OFFICIAL YOUTUBE PLAYER</strong><div class="youtube-shell-actions"><button type="button" id="stopYouTube">■ OFF AIR</button></div></div>
+            <details class="radio-test-options"><summary>ADVANCED AUDIO DIAGNOSTICS</summary><button type="button" id="testYouTubeEmbed" title="Check if a sample video can play inside this dashboard">TEST PLAYER</button></details>
             <div id="youtubePlayerMount" class="youtube-player-mount"></div>
-            <p class="youtube-hint">Playback stays in the visible integrated YouTube player. If all playlists fail, use TEST EMBED to check a separate official YouTube sample. The test does not modify your stations.</p>
+            <p class="youtube-hint">Playback stays in the visible integrated YouTube player. If a channel fails, the optional audio diagnostics can check an official sample without modifying stations.</p>
           </div>
           <div class="radio-inputs"><div class="source-label">OTHER SOURCES · LOCAL FILES &amp; INTERNET RADIO</div><label class="file-picker" for="audioFiles">+ ADD LOCAL MUSIC</label><input id="audioFiles" class="sr-only" type="file" multiple accept="audio/*"><div class="stream-row"><input id="streamUrl" type="url" placeholder="Internet radio stream URL (https://…)" aria-label="Internet radio URL"><button id="playStream" title="Play radio stream">TUNE IN</button></div></div>
           <div id="playlist" class="playlist"></div>
