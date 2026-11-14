@@ -267,6 +267,7 @@ function shipInit(){
  });
  $('shipImport').addEventListener('click',()=>{
   try{const fit=L.parseEftFit($('shipEft').value);
+   $('shipLibrarySelect').value=''; // imported fittings create a new profile, never overwrite the factory hull
    $('shipName').value=fit.name;$('shipHull').value=fit.hull;$('shipModules').value=fit.modules.join('\n');
    shipMessage('EFT recognized '+fit.modules.length+' modifiers.'+(fit.unrecognized.length?' Unsupported: '+fit.unrecognized.slice(0,3).join(', '):'')+' Fetch ESI hull, verify fittings/skills, then SAVE.');
   }catch(e){shipMessage('EFT import: '+e.message);}
@@ -1235,7 +1236,7 @@ const settingsManager=(()=>{
   }
   if(['Safer','Shorter','LessSecure'].includes(haul.preference))$('haulRoutePref').value=haul.preference;
   const mine=data.mining||{};
-  if(typeof mine.profileName==='string'&&mine.profileName.trim())$('miningProfileName').value=mine.profileName.slice(0,56);
+  if(typeof mine.profileName==='string'&&mine.profileName.trim())$('miningProfileName').value=(mine.profileName==='High on Supply / Retriever'?'Retriever':mine.profileName.slice(0,56));
   for(const [id,key,min,max] of [['miningOreYield','oreYield',0,1000000],['miningOreCycle','oreCycle',0.1,10000],['miningOreModules','oreModules',1,16],['miningIceUnits','iceUnits',0,1000],['miningIceCycle','iceCycle',0.1,10000],['miningIceModules','iceModules',1,16],['miningUptime','uptimePct',1,100],['miningHandling','handlingMinutes',0,10000]]){
    const v=mine[key];if(v===null||v===undefined||v===''){if(['miningOreYield','miningOreCycle','miningIceUnits','miningIceCycle'].includes(id))$(id).value='';continue;}
    if(Number.isFinite(+v)&&+v>=min&&+v<=max)$(id).value=v;
