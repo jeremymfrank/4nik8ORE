@@ -198,7 +198,7 @@ function shipCatalogInit(){
   catch(e){shipMessage('Could not add ship · '+e.message);}
   finally{refreshCatalogMatches();}
  });
- if(!fresh)fetchShipCatalog(); // Nonblocking: finish UI startup while ESI loads.
+ return fresh?Promise.resolve():fetchShipCatalog(); // Nonblocking when called during UI startup.
 }
 function shipMenus(){
  const saved='<optgroup label="Saved ship profiles">'+shipLibrary.map(s=>'<option value="'+L.escape(s.id)+'">'+L.escape(s.name)+' · '+L.escape(s.hull)+'</option>').join('')+'</optgroup>';
