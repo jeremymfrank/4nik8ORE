@@ -123,5 +123,10 @@ const M=window.ICMarketExplorer,R=window.ICResourceBrowser;
  assert(!el('marketExplorerStatus').textContent.includes('3/3'),'wormhole regions excluded from public markets');
  assert(requests.some(x=>x.includes('/markets/groups/')));
  assert(requests.some(x=>x.includes('/markets/10000043/orders/')));
+ const everyBuyOrder=await M.getOrders(10000002,1006,'buy');
+ assert.equal(everyBuyOrder.length,2,'all buy orders across ESI page boundaries included');
+ assert.deepEqual(everyBuyOrder.map(x=>[x.order_id,x.price,x.volume_remain,x.min_volume,x.range]).sort(),
+  [[2,18,80,1,'region'],[5,17,33,7,'3']].sort());
+
  console.log('PASS complete all-item market groups, mining category paths, compressed matching, regional highest bids/lowest asks, full region coverage and price visualization');
 })().catch(e=>{console.error(e);process.exitCode=1;});
