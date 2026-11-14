@@ -63,12 +63,14 @@ function refreshCatalogMatches(){
  if(matches.some(s=>String(s.id)===current))box.value=current;
  $('shipCatalogAdd').disabled=!matches.length||catalogLoading;
  $('shipCatalogExport').disabled=!shipCatalog.length||catalogLoading;
- const suffix=matches.length>80?' · first 80 shown (refine search)':'';
- if(shipCatalog.length)catalogStatus(shipCatalog.length.toLocaleString()+
-  ' hull IDs indexed'+(catalogGroupCount?' · '+catalogGroupCount+' ship groups':'')+
-  (catalogMissingNames?' · '+catalogMissingNames+' names unavailable':'')+
-  (catalogComplete?(Date.now()-catalogCacheAt>SHIP_CATALOG_AGE?' · stale offline copy':' · cached locally'):' · partial catalog')+
-  ' · '+matches.length+' matching'+suffix);
+ const typed=$('shipCatalogSearch').value.trim().length>0;
+ if(shipCatalog.length){
+  const status=typed?(matches.length+' matching ship'+(matches.length===1?'':'s')+
+   (matches.length>80?' · refine search to narrow the list':'')+' · choose one above'):
+   (shipCatalog.length.toLocaleString()+' ship hulls ready · search by name or class');
+  catalogStatus(status+
+   (catalogComplete?'': ' · API data incomplete; retry through Maintenance when online'));
+ }
 }
 // ESI may reject a large name batch containing a single deleted/unpublished ID.
 // Divide only on an actual 400/404; never recursively retry a network outage.
