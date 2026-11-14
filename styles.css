@@ -493,3 +493,6 @@ input[type=search]{background:#101415;color:#f1e5cb;border:1px solid #57605b;bor
  .trade-results{max-height:65vh}
  .market-audit-pagination{flex-wrap:wrap}
 }
+
+/* Keep potentially long local settings validation errors readable instead of clipping them. */
+#settingsStatus{overflow-wrap:anywhere;min-width:0;max-width:100%;white-space:normal;line-height:1.45}
