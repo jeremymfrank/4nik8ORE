@@ -28,6 +28,10 @@ const known={
  procurer:{name:'Procurer',group_id:20,published:true,mass:11000000,capacity:350,
   dogma_attributes:[{attribute_id:70,value:.6},{attribute_id:600,value:3}]}
 };
+// A plausible full catalog contains many hulls; tiny cached lists are rejected.
+const extra=Array.from({length:10},(_,i)=>({id:900000+i,name:'Test Hull '+i}));
+known.mining.types.push(...extra.map(s=>s.id));
+known.names.push(...extra);
 const calls=[];
 async function fetch(url){
  calls.push(String(url));
@@ -50,13 +54,15 @@ new Function('window','document','fetch','localStorage','setTimeout','clearTimeo
  await win.__test.shipCatalogInit(); // ESI fetch starts automatically on first use.
  win.__test.shipInit(); // On a cached startup, no additional category fetch occurs.
  assert.equal(win.__test.getLibrary().find(p=>p.id==='retriever').name,'Retriever');
- assert.deepEqual(win.__test.getCatalog().map(s=>s.name),['Badger','Procurer','Retriever']);
+ assert.deepEqual(win.__test.getCatalog().map(s=>s.name).slice(0,3),['Badger','Procurer','Retriever']);
+ assert.equal(win.__test.getCatalog().length,13);
  const completeCsv=win.__test.catalogCsv();
  assert(completeCsv.includes('"17481","Procurer","Mining Barge"'));
  assert(completeCsv.includes('"649","Badger","Industrial"'));
- assert.equal(completeCsv.trim().split(/\r?\n/).length,4);
+ assert.equal(completeCsv.trim().split(/\r?\n/).length,14);
  assert.equal(element('shipCatalogExport').disabled,false);
  assert(store.has('4nik8.ship.catalog.v1'));
+ assert.equal(JSON.parse(store.get('4nik8.ship.catalog.v1')).version,2);
  assert(element('freightShipSelect').innerHTML.includes('catalog:17481'));
  const p=await win.__test.addShipFromCatalog(17481);
  assert.equal(p.name,'Procurer');
