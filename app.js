@@ -178,14 +178,24 @@ function showShipEditor(){
 }
 function shipMessage(message){$('shipLibraryStatus').textContent=message;}
 async function fetchHull(p,updateEditor=false){
- const ids=await resolveNames([p.hull]);
- const t=(ids.inventory_types||[]).find(x=>x.name.toLowerCase()===p.hull.toLowerCase());
- if(!t)throw Error('Unknown EVE ship hull '+p.hull);
- const detail=await request('/universe/types/'+t.id+'/',{},86400000);
+ let id=Number(p.typeId)||0;
+ if(!id){
+  const ids=await resolveNames([p.hull]);
+  const t=(ids.inventory_types||[]).find(x=>x.name.toLowerCase()===p.hull.toLowerCase());
+  if(!t)throw Error('Unknown EVE ship hull '+p.hull);
+  id=t.id;
+ }
+ const detail=await request('/universe/types/'+id+'/',{},86400000);
+ if(detail.published===false)throw Error('This EVE hull is not published for pilots');
+ if(detail.group_id){
+  const group=await request('/universe/groups/'+detail.group_id+'/',{},86400000);
+  if(group.category_id!==6)throw Error('Selected item is not an EVE ship hull');
+ }
  const base=L.shipHullFromESI(detail);
- if(!(base.mass>0&&base.inertia>0&&base.warp>0))throw Error('Incomplete ESI ship attributes');
- p.base=base;p.typeId=t.id;
- if(updateEditor)for(const [key,id] of Object.entries(SHIP_BASE_FIELDS))$(id).value=base[key]||0;
+ if(!(base.mass>0&&base.inertia>0&&base.warp>0))throw Error('Incomplete ESI ship attributes; enter fitted stats manually');
+ p.base=base;p.typeId=id;
+ if(typeof detail.name==='string'&&detail.name.trim())p.hull=detail.name.trim();
+ if(updateEditor)for(const [key,field] of Object.entries(SHIP_BASE_FIELDS))$(field).value=base[key]||0;
  shipReadouts();settingsManager.schedule();
 }
 function validShip(p){
@@ -197,17 +207,26 @@ function validShip(p){
  return ['cargoSkillPct','specialHoldSkillPct','exactCapacity','exactAlign','exactWarp'].every(k=>Number.isFinite(+p[k])&&+p[k]>=((k.includes('Skill'))?-90:0)&&+p[k]<=1e9);
 }
 function shipInit(){
- shipMenus();showShipEditor();
+ shipMenus();showShipEditor();shipCatalogInit();
  $('shipLibrarySelect').addEventListener('change',showShipEditor);
- for(const role of Object.keys(SHIP_SELECTS))$(SHIP_SELECTS[role]).addEventListener('change',()=>{
-  if(role==='mining'&&miningSession){$(SHIP_SELECTS[role]).value=selectedShips.mining;shipMessage('Finish or cancel the active mining calibration before switching miners.');return;}
+ for(const role of Object.keys(SHIP_SELECTS))$(SHIP_SELECTS[role]).addEventListener('change',async()=>{
+  const select=$(SHIP_SELECTS[role]);
+  if(role==='mining'&&miningSession){select.value=selectedShips.mining;shipMessage('Finish or cancel the active mining calibration before switching miners.');return;}
+  const chosen=select.value;
+  if(chosen.startsWith('catalog:')){
+   select.disabled=true;
+   try{const profile=await addShipFromCatalog(Number(chosen.slice(8)));select.value=profile.id;}
+   catch(err){shipMessage('Ship selection failed · '+err.message);select.value=selectedShips[role];return;}
+   finally{select.disabled=false;}
+  }
   if(role==='mining')rememberMiningCalibration();
-  selectedShips[role]=$(SHIP_SELECTS[role]).value;
+  selectedShips[role]=select.value;
   if(role==='mining')restoreMiningCalibration();
   shipReadouts();settingsManager.schedule();
   const p=chosenShip(role);
-  if(p&&!p.base?.warp)fetchHull(p).then(()=>{if(role==='freight'){repriceFreight();drawRows();}if(role==='ore')miningRefresh();})
-   .catch(e=>shipMessage('ESI ship lookup unavailable · '+e.message));
+  if(p&&!p.base?.warp)fetchHull(p).then(()=>{
+    if(state.results.length){repriceFreight();drawRows();const focused=state.results.find(x=>x.name===state.selected);if(focused)selectItem(focused.name);}
+   }).catch(err=>shipMessage('Ship hull attributes unavailable · '+err.message));
   if(role==='freight'&&state.results.length){repriceFreight();drawRows();const item=state.results.find(x=>x.name===state.selected);if(item)selectItem(item.name);}
   if(role==='ore'||role==='mining')miningRefresh();
   if(role==='trade'){
@@ -231,7 +250,7 @@ function shipInit(){
    exactCapacity:+$('shipExactCapacity').value||0,exactCapacityKind:$('shipExactKind').value,exactAlign:+$('shipExactAlign').value||0,
    exactWarp:+$('shipExactWarp').value||0,modules};
   if(!validShip(p)){shipMessage('Invalid data or unsupported modifier. Use recognized EVE module/rig names.');return;}
-  if(!current&&shipLibrary.length>=32){shipMessage('Ship library is limited to 32 saved fits.');return;}
+  if(!current&&shipLibrary.length>=128){shipMessage('Ship library is limited to 128 saved fits.');return;}
   if(current){if(current.hull===p.hull&&current.typeId)p.typeId=current.typeId;Object.assign(current,p);}
   else shipLibrary.push(p);
   shipMenus();$('shipLibrarySelect').value=p.id;showShipEditor();settingsManager.schedule();
@@ -1227,7 +1246,12 @@ const settingsManager=(()=>{
   if(mine.session && ['ore','ice'].includes(mine.session.kind) && Number.isFinite(+mine.session.startedAt) && mine.session.startedAt>0 && mine.session.startedAt<=Date.now())miningSession={kind:mine.session.kind,startedAt:+mine.session.startedAt};
   else miningSession=null;
   const savedShips=data.ships||{};
-  if(Array.isArray(savedShips.library)&&savedShips.library.length>0&&savedShips.library.length<=32&&savedShips.library.every(p=>p&&Array.isArray(p.modules)&&validShip(p)))shipLibrary=savedShips.library.map(p=>({...p,base:{...p.base},modules:[...p.modules]}));
+  if(Array.isArray(savedShips.library)&&savedShips.library.length>0&&savedShips.library.length<=128&&savedShips.library.every(p=>p&&Array.isArray(p.modules)&&validShip(p)))shipLibrary=savedShips.library.map(p=>({...p,base:{...p.base},modules:[...p.modules]}));
+  // Migrate only the historical factory Retriever label, not custom ship names.
+  const factoryRetriever=shipLibrary.find(p=>p.id==='retriever'&&p.hull==='Retriever');
+  if(factoryRetriever?.name==='High on Supply')factoryRetriever.name='Retriever';
+  if(factoryRetriever?.miningCalibration?.profileName==='High on Supply / Retriever')
+   factoryRetriever.miningCalibration.profileName='Retriever';
   for(const role of Object.keys(selectedShips))if(typeof savedShips.selections?.[role]==='string')selectedShips[role]=savedShips.selections[role];
   shipMenus();
   if(chosenShip('mining')?.miningCalibration)restoreMiningCalibration();else rememberMiningCalibration();
