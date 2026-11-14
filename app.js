@@ -1268,7 +1268,7 @@ const settingsManager=(()=>{
   rememberMiningCalibration();
   return {schemaVersion:1,livery:readLocal(keys.livery,'neon'),
    radio:{volume:Number.isFinite(n)?Math.max(0,Math.min(100,n)):55,shuffle:readLocal(keys.shuffle,'0')==='1',channels:channels.slice(0,40),selectedChannelId:readLocal(keys.last,'')},
-   scanner:{system:$('systemInput').value.trim(),hub:$('hubSelect').value,resource:state.resource,cargo:Math.max(1,Math.trunc(+$('cargoVolume').value||31625))},haul:{...freightInputs(),capacity:Math.max(1,+$('haulCapacity').value||31625)},mining:miningSnapshot(),trade:tradeSettings(),ships:{library:shipLibrary,selections:selectedShips}};
+   scanner:{system:$('systemInput').value.trim(),hub:$('hubSelect').value,resource:state.resource,cargo:Math.max(1,Math.trunc(+$('cargoVolume').value||31625)),resourceIds:window.ICResourceBrowser.selected()},haul:{...freightInputs(),capacity:Math.max(1,+$('haulCapacity').value||31625)},mining:miningSnapshot(),trade:tradeSettings(),ships:{library:shipLibrary,selections:selectedShips}};
  }
  function apply(data){
   if(!data||data.schemaVersion!==1)return;
@@ -1315,6 +1315,7 @@ const settingsManager=(()=>{
   if(typeof scan.system==='string'&&scan.system)$('systemInput').value=scan.system;
   if(typeof scan.hub==='string'&&[...$('hubSelect').options].some(x=>x.value===scan.hub))$('hubSelect').value=scan.hub;
   if(Number.isFinite(+scan.cargo)&&+scan.cargo>0)$('cargoVolume').value=+scan.cargo;
+   if(Array.isArray(scan.resourceIds))window.ICResourceBrowser.restore(scan.resourceIds);
    if(['ore','ice','both','moon','gas'].includes(scan.resource)){
    state.resource=scan.resource;
    document.querySelectorAll('[data-resource]').forEach(b=>{const yes=b.dataset.resource===scan.resource;b.classList.toggle('active',yes);b.setAttribute('aria-pressed',String(yes));});
