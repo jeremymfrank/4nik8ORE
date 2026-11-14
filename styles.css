@@ -286,3 +286,75 @@ body{background:radial-gradient(ellipse at 58% 0%,#373023 0%,transparent 28%),re
 .trade-run-footer{font-size:9px;line-height:1.5;color:var(--muted);margin-top:9px}
 .trade-results .muted{line-height:1.6;font-size:11px}
 @media(max-width:430px){.trade-inputs{grid-template-columns:1fr}.trade-run-price{grid-template-columns:1fr}}
+
+/* v0.5: flexible monitor-independent dashboard and fitted ship controls. */
+html,body{width:100%;max-width:100%;overflow-x:hidden}
+.frame{width:100%;min-width:0}
+main,.panel,.masthead,.headline,.freight-summary,.op-card{min-width:0}
+.section-name{white-space:normal;flex-wrap:wrap;line-height:1.5}
+.section-name .small-label{white-space:normal}
+.section-ship-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:0 0 12px;padding:9px 11px;border:1px solid var(--edge);border-radius:5px;background:#101b20}
+.section-ship-row .field{flex:1 1 210px;max-width:430px}
+.section-ship-row select{min-width:0;max-width:100%;min-height:40px}
+.ship-readout{flex:2 1 200px;color:var(--green);font-size:11px;line-height:1.65;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.ship-note{font-size:11px;color:var(--muted);line-height:1.65;margin:2px 0 14px}
+.ship-editor-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:10px}
+.ship-editor-grid .field{min-width:0}
+.ship-editor-grid .ship-wide{grid-column:1/-1}
+.ship-editor-grid .field>span{font-size:10px;line-height:1.45}
+.ship-editor-grid input,.ship-editor-grid select,.ship-editor-grid textarea{width:100%;min-width:0;min-height:39px;background:#101415;color:#f1e5cb;border:1px solid #57605b;border-radius:4px;padding:9px;font-size:12px}
+.ship-editor-grid textarea{resize:vertical;line-height:1.4;min-height:85px}
+.ship-actions{display:flex;gap:8px;flex-wrap:wrap;margin:13px 0}
+.ship-actions button{cursor:pointer;border:1px solid #685f48;background:#272a2b;color:#f5d8a9;border-radius:4px;padding:10px 12px;font-size:11px;font-weight:800;flex:1 1 105px}
+.ship-actions .ship-save{background:var(--amber);color:#101417;border-color:var(--amber)}
+.ship-library-status{font-size:11px;line-height:1.5;color:var(--green);padding:10px;background:#111e1e;border-left:3px solid var(--amber);overflow-wrap:anywhere}
+#haulCapacity[readonly]{opacity:.65;cursor:not-allowed}
+input,select,textarea,button{max-width:100%;min-width:0}
+button,select{overflow-wrap:anywhere}
+iframe,video,img{max-width:100%}
+.freight-destination-top,.freight-destination-bottom,.trade-run-points>div{flex-wrap:wrap}
+.freight-destination-bottom span,.trade-run-points strong,.freight-region{overflow-wrap:anywhere}
+@media(min-width:1400px){
+ .frame{max-width:min(96vw,2300px);padding:18px 22px 30px}
+ main{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+ main>.panel{grid-column:span 1!important}
+ main>.bottom{grid-column:1/-1}
+ .panel{padding:clamp(15px,1vw,23px)}
+ .mining,.trade,.ship-library{grid-column:span 1}
+ .opportunity-list{min-height:360px}
+}
+@media(min-width:2100px){
+ .frame{max-width:min(96vw,2800px)}
+ main{grid-template-columns:repeat(4,minmax(0,1fr));gap:17px}
+ .radio{grid-column:span 2!important}
+ .ship-library{grid-column:span 2!important}
+ .brand-titles h1{font-size:clamp(25px,1.3vw,34px)}
+}
+@media(max-width:620px){
+ .frame{padding:8px;min-width:0}
+ .panel{padding:12px}
+ .field-row,.config-row{flex-wrap:wrap}
+ .field-row>.field,.config-row>.field{flex:1 1 100%;width:100%}
+ .config-row>.segmented{flex:1 1 100%}
+ .segment{padding:10px 4px;font-size:11px}
+ .section-ship-row{align-items:stretch}
+ .section-ship-row .field,.ship-readout{flex-basis:100%}
+ .freight-settings,.mining-profile-grid,.mining-input-grid,.mining-session-row,.trade-inputs{grid-template-columns:1fr}
+ .mining-options{grid-template-columns:1fr}
+ .mining-options .check-field{grid-column:auto}
+ .headline{flex-wrap:wrap}
+ .headline-value{text-align:left;white-space:normal}
+ .op-card{flex-wrap:wrap}
+ .op-price{white-space:normal;text-align:right}
+ .trade-run-price{grid-template-columns:1fr}
+ .ship-actions button{flex-basis:calc(50% - 6px)}
+ .brand-titles{min-width:130px}
+ .conn-status{margin-left:0}
+}
+@media(max-width:370px){
+ .channel-form{grid-template-columns:1fr}
+ .channel-form-actions{flex-wrap:wrap}
+ .player-controls{flex-wrap:wrap}
+ .ship-editor-grid{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){.op-card{transition:none}}
