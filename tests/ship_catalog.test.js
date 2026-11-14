@@ -33,13 +33,17 @@ const extra=Array.from({length:10},(_,i)=>({id:900000+i,name:'Test Hull '+i}));
 known.mining.types.push(...extra.map(s=>s.id));
 known.names.push(...extra);
 const calls=[];
-async function fetch(url){
+async function fetch(url,options={}){
  calls.push(String(url));
  let value;
  if(url.includes('/universe/categories/6'))value=known.category;
  else if(url.includes('/universe/groups/20'))value=known.mining;
  else if(url.includes('/universe/groups/21'))value=known.industrial;
- else if(url.includes('/universe/names'))value=known.names;
+ else if(url.includes('/universe/names')){
+  const requested=JSON.parse(options.body||'[]');
+  if(requested.includes(900004))return {ok:false,status:404,statusText:'Not Found'};
+  value=known.names.filter(x=>requested.includes(x.id));
+ }
  else if(url.includes('/universe/types/17481'))value=known.procurer;
  else throw Error('Unexpected mocked ESI call '+url);
  return {ok:true,json:async()=>value};
@@ -55,14 +59,17 @@ new Function('window','document','fetch','localStorage','setTimeout','clearTimeo
  win.__test.shipInit(); // On a cached startup, no additional category fetch occurs.
  assert.equal(win.__test.getLibrary().find(p=>p.id==='retriever').name,'Retriever');
  assert.deepEqual(win.__test.getCatalog().map(s=>s.name).slice(0,3),['Badger','Procurer','Retriever']);
- assert.equal(win.__test.getCatalog().length,13);
+ assert.equal(win.__test.getCatalog().length,13); // All type IDs survive a missing ESI name.
+ assert(win.__test.getCatalog().some(s=>s.id===900004&&s.name==='UNRESOLVED TYPE #900004'));
  const completeCsv=win.__test.catalogCsv();
  assert(completeCsv.includes('"17481","Procurer","Mining Barge"'));
  assert(completeCsv.includes('"649","Badger","Industrial"'));
+ assert(completeCsv.includes('"900004","UNRESOLVED TYPE #900004","Mining Barge"'));
  assert.equal(completeCsv.trim().split(/\r?\n/).length,14);
  assert.equal(element('shipCatalogExport').disabled,false);
  assert(store.has('4nik8.ship.catalog.v1'));
  assert.equal(JSON.parse(store.get('4nik8.ship.catalog.v1')).version,2);
+ assert.equal(JSON.parse(store.get('4nik8.ship.catalog.v1')).missingNames,1);
  assert(element('freightShipSelect').innerHTML.includes('catalog:17481'));
  const p=await win.__test.addShipFromCatalog(17481);
  assert.equal(p.name,'Procurer');
