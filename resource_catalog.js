@@ -40,6 +40,7 @@ function onCatalogLoaded(){seedDefaultSelection();render();}
 function setMode(value){mode=value;render();}
 function restore(ids){
  if(!Array.isArray(ids)||ids.length>MAX_SELECTED||ids.some(x=>!Number.isInteger(x)||x<=0))return;
+ if(!ids.length&&localStorage.getItem(KEY)===null)return; // v0.5 settings had no resource selections; seed the familiar starter set
  selected=new Set(ids);firstLaunch=false;save();render();
 }
 function init(currentMode='both'){
