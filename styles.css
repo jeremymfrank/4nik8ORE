@@ -571,3 +571,17 @@ input[type=search]{background:#101415;color:#f1e5cb;border:1px solid #57605b;bor
 .freight-terms .freight-disclaimer{margin:0;padding:10px 12px}
 .freight-destinations{max-height:min(62vh,560px)}
 @media(max-width:520px){.freight-selected{flex-direction:column;align-items:flex-start}.freight-destinations{max-height:66vh}}
+
+
+/* Optional maintenance tools remain available but never dominate pilot workflows */
+.resource-maintenance,.scan-maintenance,.market-catalog-maintenance,.radio-test-options{margin:9px 0 4px;border:1px solid #343b3b;border-radius:5px;background:#141b1d;min-width:0}
+.resource-maintenance>summary,.scan-maintenance>summary,.market-catalog-maintenance>summary,.radio-test-options>summary{font-size:10px;font-weight:750;letter-spacing:.4px;cursor:pointer;padding:9px 11px;color:var(--muted);list-style:none}
+.resource-maintenance>summary::before,.scan-maintenance>summary::before,.market-catalog-maintenance>summary::before,.radio-test-options>summary::before{content:"▸";margin-right:8px;color:var(--amber)}
+.resource-maintenance[open]>summary::before,.scan-maintenance[open]>summary::before,.market-catalog-maintenance[open]>summary::before,.radio-test-options[open]>summary::before{content:"▾"}
+.resource-maintenance>button,.scan-maintenance>button,.radio-test-options>button{margin:0 11px 11px;min-height:36px;padding:8px 11px;border:1px solid var(--edge2);border-radius:4px;background:#2a2b29;color:#e9c98c;font-size:11px;font-weight:800;cursor:pointer}
+.scan-maintenance>button:disabled{opacity:.4;cursor:default}
+.market-catalog-maintenance .market-catalog-actions{margin:0 9px 9px;border:0;background:transparent;padding:6px}
+.market-catalog-actions:has(> #marketCatalogSummary){padding:8px 11px;margin:6px 0}
+.market-catalog-actions #marketCatalogSummary{flex:1}
+.ship-quick-stats .ship-esistatus-loading{color:var(--amber)}
+.ship-quick-stats .ship-quick-heading .ship-info-error{color:var(--bad)}
