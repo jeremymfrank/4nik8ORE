@@ -124,6 +124,7 @@ function shipInit(){
   shipMessage('Saved '+p.name+'. Manual fitted overrides include pilot skills and unsupported bonuses.');
   if(!p.base.warp)fetchHull(shipLibrary.find(x=>x.id===p.id),true).catch(e=>shipMessage('Saved; ESI lookup unavailable · '+e.message));
   if(state.results.length){repriceFreight();drawRows();const focused=state.results.find(x=>x.name===state.selected);if(focused)selectItem(focused.name);else miningRefresh();}
+  if(selectedShips.trade===p.id&&tradeScanned.length){tradeScanned=[];$('tradeResults').innerHTML='<p class="muted">Trading fit changed. Rescan to recalculate order quantities, transport time and profitability.</p>';tradeStatus('Trading fit updated · rescan trade runs');}
  });
  $('shipDelete').addEventListener('click',()=>{
   const id=$('shipLibrarySelect').value,p=shipLibrary.find(s=>s.id===id);if(!p)return;
@@ -386,7 +387,7 @@ function drawRows(){
  const leader=hourly?displayed.find(x=>bestHourlyBuyer(x)):displayed.find(x=>x.winner);
  const lw=leader?effectiveBuyer(leader):null;
  $('bestName').textContent=leader?.name||(hourly?'Calibrate ship yield':'No visible buy orders');
- $('bestPrice').textContent=leader?(hourly?L.formatIsk(miningMetric(leader,lw).allInIskHour):bestPriceDisplay(oreProfitEstimate(leader,lw)?.net/leader.volume||lw.quote.perM3)):'—';
+ $('bestPrice').textContent=leader?(hourly?L.formatIsk(miningMetric(leader,lw).allInIskHour):bestPriceDisplay(oreProfitEstimate(leader,lw)?oreProfitEstimate(leader,lw).net/leader.volume:lw.quote.perM3)):'—';
  $('headlineUnit').textContent=hourly?'ISK / HOUR · ALL-IN EST.':leader&&oreProfitEstimate(leader,lw)?'ISK / mined m³ · EST. NET':'ISK / mined m³ · GROSS';
  $('dataFootnote').textContent=leader?'Order books are live; net estimates subtract user-defined sales tax and freight costs where ESI stargate routes were verified. No PvP risk, compression fees or mining site availability included.':'No executable public buy orders for the selected sample load. Private structure orders are not included.';
 }
