@@ -52,7 +52,11 @@ async function fetch(url,opts={}){
  else if(/^\/markets\/groups\/\d+\/$/.test(pathname))data=marketGroups.find(x=>x.market_group_id===Number(pathname.split('/')[3]));
  else if(pathname==='/universe/names/'){
   data=JSON.parse(opts.body).filter(id=>fakeNames.has(id)).map(id=>({id,name:fakeNames.get(id)}));
- }else if(pathname==='/universe/ids/')data={inventory_types:[{id:1006,name:'Tritanium'}]};
+ }else if(pathname==='/universe/ids/')data={inventory_types:[{id:1006,name:'Tritanium'}],
+  systems:[{id:30002187,name:'Sosala'}]};
+ else if(pathname==='/universe/systems/30002187/')data={name:'Sosala',constellation_id:20000017};
+ else if(pathname==='/universe/constellations/20000017/')data={region_id:10000043};
+ else if(pathname==='/universe/stations/60000102/')data={system_id:30002187,name:'Demo NPC Station'};
  else if(/^\/universe\/types\/\d+\/$/.test(pathname)){
   const id=Number(pathname.split('/')[3]);
   const group=marketGroups.find(g=>(g.types||[]).includes(id));
@@ -106,6 +110,8 @@ const M=window.ICMarketExplorer,R=window.ICResourceBrowser;
  el('marketQuantity').value='15';
  el('marketAccessFilter').value='all';
  el('marketAuditSide').value='buy';
+ el('marketDeliveryStation').value='60000102';
+ el('systemInput').value='Sosala';
  el('marketExplorerScope').value='all';
  await M.explore();
  assert(el('marketBestBuy').textContent.includes('20'),'buy price is the lowest sell ask');
@@ -116,6 +122,8 @@ const M=window.ICMarketExplorer,R=window.ICResourceBrowser;
  assert(el('marketExplorerStatus').textContent.includes('3 market-order pages'),'all paginated region orders fetched');
  assert(el('marketAuditSummary').textContent.includes('5 total validated ESI records'),'ESI order totals include page 2');
  assert(el('marketAuditTable').innerHTML.includes('3 jumps'),'numeric EVE buy-order ranges visible');
+ assert(el('marketAuditTable').innerHTML.includes('DELIVERY YES'),'local system ranged bid eligible in selected station');
+ assert(el('marketExplorerLocal').innerHTML.includes('Sosala'),'local-versus-global market comparison present');
  assert(el('marketAuditTable').innerHTML.includes('70'),'remaining quantity preserved');
  assert(el('marketQuantitySummary').innerHTML.includes('15 units'),'quantity quote generated');
 
