@@ -10,7 +10,11 @@ function filtered(){
  const search=$('resourceFilter').value.trim().toLowerCase();
  return market().resourceItems(mode).filter(x=>!search||x.name.toLowerCase().includes(search)||x.group.toLowerCase().includes(search));
 }
-function save(){try{localStorage.setItem(KEY,JSON.stringify([...selected]));}catch(_){}}
+function save(){
+ try{localStorage.setItem(KEY,JSON.stringify([...selected]));}catch(_){}
+ if(typeof global.CustomEvent==='function')
+  global.dispatchEvent(new global.CustomEvent('ic-resource-selection-changed'));
+}
 function render(){
  const all=market().resourceItems(mode),found=filtered(),list=$('resourcePick');
  list.innerHTML='';
@@ -25,7 +29,7 @@ function render(){
  $('resourceCatalogStatus').textContent=market().catalogState().count.toLocaleString()+
   ' EVE market item IDs indexed · '+all.length+' resources in selected class · '+
   inCategory+' selected in this class · '+found.length+' matches'+(found.length>200?' (first 200 shown; refine search)':'')+
-  ' · Scan 1–12 selected variants (Ctrl-click to select multiple).';
+  ' · Filter results are not scanned automatically; click SCAN MARKETS after changing selection.';
 }
 function seedDefaultSelection(){
  if(!firstLaunch||!market().catalogState().complete)return;
