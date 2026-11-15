@@ -217,3 +217,8 @@ Verified locally with mocked ESI responses via `node tests/ship_catalog.test.js`
 **Limits:** Public ESI has hull dogma attributes but no anonymous access to a player's actual fitted skills, implants or ship modifiers. Specialized holds that are not modeled fully may require actual in-game fitted values. The normal pilot does not need to type hull statistics. Stargates Only remains the default route mode; public market orders are subject to access, quantity and range rules.
 
 **Tests:** node tests/ship_catalog.test.js now covers zero-click base Retriever hydration, removal of zero-valued editor fields, one-click EVE fitting import, saved profiles and independent selectors. Existing ship math, exact market order and market explorer integration tests remain in the suite. Browser layout and Windows save/restart persistence still require a live PC verification.
+
+
+## Android edition (Scooter build)
+
+A standalone Android WebViewAssetLoader app shares Industrial Command v0.6.2's ESI market, ship and calculation sources with Windows. It adds an Android touch navigation bar (Mine / Freight / Market / Ships / Radio), device-private atomic settings storage, Android system backup file import/export, an origin-restricted native message bridge, and APK builds via GitHub Actions. It does not require the Windows server or any cloud account. The Android app's base interface is bundled, while live ESI prices and catalog refreshes need Internet. See [Android installation and build instructions](android/README.md). The **Android Industrial Command APK** workflow publishes a debug-signed APK artifact for installation; stable production signing is not configured yet.
