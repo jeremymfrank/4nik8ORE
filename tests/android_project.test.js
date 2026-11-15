@@ -1,0 +1,27 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const root=path.join(__dirname,'..');
+const get=p=>fs.readFileSync(path.join(root,p),'utf8');
+const index=get('index.html'),gradle=get('android/app/build.gradle.kts'),manifest=get('android/app/src/main/AndroidManifest.xml');
+const native=get('android/app/src/main/java/com/fournik8/industrialcommand/MainActivity.java');
+const bridge=get('android_bridge.js'),css=get('android.css'),actions=get('.github/workflows/android-apk.yml');
+assert(index.includes('src="android_bridge.js"'));
+assert(index.indexOf('src="android_bridge.js"')<index.indexOf('src="app.js"'));
+for(const file of ['index.html','app.js','logic.js','styles.css','market_accuracy.js','market_explorer.js','resource_catalog.js','android_bridge.js','android.css','assets/**'])
+ assert(gradle.includes('include("'+file+'")'),'Asset must be packaged: '+file);
+assert(manifest.includes('android.permission.INTERNET'));
+assert(manifest.includes('android:usesCleartextTraffic="false"'));
+assert(!manifest.includes('READ_EXTERNAL_STORAGE'));
+assert(native.includes('WebViewAssetLoader'));
+assert(native.includes('addWebMessageListener'));
+assert(native.includes('if (!isMainFrame || !isTrustedOrigin(sourceOrigin)) return;'));
+assert(native.includes('AtomicFile'));
+assert(native.includes('Intent.ACTION_CREATE_DOCUMENT'));
+assert(native.includes('FileChooserParams.parseResult'));
+assert(!native.includes('addJavascriptInterface'),'Do not expose native permissions to third-party iframes');
+assert(bridge.includes("global.location?.hostname!=='appassets.androidplatform.net'"));
+assert(css.includes('#androidTabBar'));
+for(const part of ['mine:','freight:','market:','ships:','radio:'])assert(bridge.includes(part));
+assert(actions.includes(':app:assembleDebug'));
+assert(actions.includes('upload-artifact'));
+console.log('PASS Android project manifest, secure WebView bridge, private storage, real file pickers, same desktop sources and APK build workflow');
