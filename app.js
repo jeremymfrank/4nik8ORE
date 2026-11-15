@@ -669,7 +669,13 @@ async function runScan(force=false){
  try{
   const sys=await findSystem(systemName,force);state.system=sys;
   message(`${sys.name} · ${sys.security==null?'Unknown':Number(sys.security).toFixed(2)} security · ${sys.regionName} · ${Number(sys.id)>=31000000&&Number(sys.id)<32000000?'Wormhole system':'Known-space system'}`);
+  if(!window.ICMarketExplorer.catalogState().count){
+   setStatus('','INDEXING EVE CATALOG');
+   $('notice').textContent='First launch: the EVE market item catalog is being built from ESI. This can take a while; the resources will appear automatically when it finishes.';
+   $('opportunities').innerHTML='<div class="placeholder"><strong>PREPARING EVE RESOURCE CATALOG</strong><p>First-run item indexing is in progress. No live prices are available until the catalog completes.</p></div>';
+  }
   const resources=await loadResources(state.resource,force);
+  setStatus('','FETCHING MARKET ORDERS');
   const regions=scanRegions(sys.regionId,state.hub);state.coverage=regions;
   if(!regions.length)throw Error('No public regional market is available here. Use ALL PUBLIC HUB REGIONS for wormhole operations.');
   const tasks=buildTasks(resources,regions,force);
