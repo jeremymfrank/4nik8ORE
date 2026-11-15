@@ -107,6 +107,12 @@ function exportCatalog(){
  const q=s=>'"'+String(s??'').replace(/"/g,'""')+'"';
  const rows=[['type_id','item_name','market_group','market_path'],...catalog.map(x=>[x.id,x.name,x.group,x.path])];
  const csv='\uFEFF'+rows.map(row=>row.map(q).join(',')).join('\r\n')+'\r\n';
+ if(global.ICAndroid){
+  global.ICAndroid.exportFile('4nik8-eve-market-items-'+new Date().toISOString().slice(0,10)+'.csv',csv,'text/csv')
+   .then(()=>notice('marketCatalogSummary','Complete market catalog exported to Android Files'))
+   .catch(e=>notice('marketCatalogSummary','Export not saved · '+e.message));
+  return;
+ }
  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),address=URL.createObjectURL(blob);
  const a=document.createElement('a');a.href=address;a.download='4nik8-eve-market-items-'+new Date().toISOString().slice(0,10)+'.csv';
  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(address),1200);
@@ -482,6 +488,12 @@ function exportOrders(){
   o.regionId,o.regionName,o.orderId,o.typeId,o.isBuy,o.price,o.volumeRemain,
   o.volumeTotal,o.minVolume,o.range,o.locationId,o.systemId,o.issued,o.duration,o.isStructure
  ])].map(a=>a.map(q).join(',')).join('\r\n')+'\r\n';
+ if(global.ICAndroid){
+  global.ICAndroid.exportFile('4nik8-public-orders-'+lastScan.item.id+'-'+new Date().toISOString().slice(0,10)+'.csv',csv,'text/csv')
+   .then(()=>notice('marketAuditSummary','All retrieved orders exported to Android Files'))
+   .catch(e=>notice('marketAuditSummary','Export not saved · '+e.message));
+  return;
+ }
  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob);
  const node=document.createElement('a');node.href=url;node.download='4nik8-public-orders-'+
   lastScan.item.id+'-'+new Date().toISOString().slice(0,10)+'.csv';
@@ -600,6 +612,7 @@ function init(){
   if(!item)return;
   $('tradeItems').value=item;
   $('tradeScan').click();
+  global.ICAndroidUI?.openTab('freight',true);
   notice('marketExplorerStatus','Sent '+item+' to the Trade Run Scanner for stargate routing, taxes, trade capital and modeled profit. Review its independent NPC-station assumptions.');
  });
  for(const id of ['marketExplorerScope','marketDeliveryStation'])$(id).addEventListener('change',()=>{
