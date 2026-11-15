@@ -4,6 +4,10 @@ import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.Insets;
+import android.os.Build;
+import android.view.WindowInsets;
+import android.widget.FrameLayout;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.AtomicFile;
@@ -157,7 +161,24 @@ public final class MainActivity extends Activity {
                     handleNativeRequest(message, replyProxy);
                 });
 
-        setContentView(webView);
+        // Android 15+ requires edge-to-edge for apps targeting API 35. The
+        // screenshot showed status-bar text drawn over our masthead. Keep the
+        // native WebView inside the *safe* view rectangle instead of trying to
+        // guess device-specific status-bar heights in CSS.
+        FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(Color.rgb(15, 23, 25));
+        root.addView(webView, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
+        if (Build.VERSION.SDK_INT >= 35) {
+            root.setOnApplyWindowInsetsListener((view, insets) -> {
+                Insets bars = insets.getInsets(WindowInsets.Type.systemBars()
+                        | WindowInsets.Type.displayCutout());
+                view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+                return insets;
+            });
+        }
+        setContentView(root);
         webView.loadUrl(PAGE);
     }
 
