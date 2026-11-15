@@ -4,13 +4,31 @@
 const $=id=>document.getElementById(id);
 const KEY='4nik8.resource.selection.v1', MAX_SELECTED=12;
 let selected=new Set(),mode='both',firstLaunch=false,lastCatalogProgress='';
+// These EVE type IDs are a limited first-launch starter set, not a substitute
+// for the full ESI-derived catalog. The full index replaces the browse list
+// when it is ready; each item is still verified via ESI before quoting prices.
+const QUICK_START=[
+ {id:1232,name:'Dark Ochre',path:'Raw Materials > Standard Ores > Dark Ochre',group:'Dark Ochre'},
+ {id:17437,name:'Dark Ochre III-Grade',path:'Raw Materials > Standard Ores > Dark Ochre',group:'Dark Ochre'},
+ {id:1224,name:'Pyroxeres',path:'Raw Materials > Standard Ores > Pyroxeres',group:'Pyroxeres'},
+ {id:17460,name:'Pyroxeres III-Grade',path:'Raw Materials > Standard Ores > Pyroxeres',group:'Pyroxeres'},
+ {id:1229,name:'Gneiss',path:'Raw Materials > Standard Ores > Gneiss',group:'Gneiss'},
+ {id:1227,name:'Omber',path:'Raw Materials > Standard Ores > Omber',group:'Omber'},
+ {id:16262,name:'Clear Icicle',path:'Raw Materials > Ice Ores',group:'Ice Ores'}
+];
+function browseItems(mode='both'){
+ if(market().catalogState().count)return market().resourceItems(mode);
+ const allowed=mode==='both'?new Set(['ore','moon','ice']):mode==='ore'?new Set(['ore','moon']):new Set([mode]);
+ return QUICK_START.filter(x=>allowed.has(family(x))).sort((a,b)=>a.name.localeCompare(b.name));
+}
 function market(){return global.ICMarketExplorer;}
 function family(item){return market().familyOf(item);}
 function filtered(){
  const search=$('resourceFilter').value.trim().toLowerCase();
- return market().resourceItems(mode).filter(x=>!search||x.name.toLowerCase().includes(search)||x.group.toLowerCase().includes(search));
+ return browseItems(mode).filter(x=>!search||x.name.toLowerCase().includes(search)||x.group.toLowerCase().includes(search));
 }
 function save(){
+ firstLaunch=false;
  try{localStorage.setItem(KEY,JSON.stringify([...selected]));}catch(_){}
  if(typeof global.CustomEvent==='function')
   global.dispatchEvent(new global.CustomEvent('ic-resource-selection-changed'));
@@ -21,7 +39,7 @@ function touchResourcePicker(visible){
  const host=$('androidResourceChoices');
  if(!host||!global.ICAndroid)return;
  host.replaceChildren();
- const catalog=market().resourceItems('both');
+ const catalog=browseItems('both');
  const byId=new Map(catalog.map(item=>[item.id,item]));
  const chosen=[...selected].map(id=>byId.get(id)).filter(Boolean);
  const header=document.createElement('div');
@@ -59,7 +77,7 @@ function touchResourcePicker(visible){
  const matchesHeading=document.createElement('div');
  matchesHeading.className='android-resource-picked-heading';
  const term=$('resourceFilter').value.trim();
- matchesHeading.textContent=term?'MATCHING RESOURCES · TAP TO SELECT':'BROWSE RESOURCES · TAP TO SELECT';
+ matchesHeading.textContent=market().catalogState().count?(term?'MATCHING RESOURCES · TAP TO SELECT':'BROWSE RESOURCES · TAP TO SELECT'):'QUICK START · FULL EVE CATALOG STILL LOADING';
  host.appendChild(matchesHeading);
  if(!catalog.length){
   const hint=document.createElement('p');
@@ -85,7 +103,7 @@ function touchResourcePicker(visible){
  }
 }
 function render(){
- const all=market().resourceItems(mode),found=filtered(),list=$('resourcePick');
+ const all=browseItems(mode),found=filtered(),list=$('resourcePick');
  list.innerHTML='';
  for(const item of found.slice(0,200)){
   const opt=document.createElement('option');
@@ -97,9 +115,10 @@ function render(){
  touchResourcePicker(found);
  const inCategory=all.filter(x=>selected.has(x.id)).length;
  if(!market().catalogState().count){
-  $('resourceCatalogStatus').textContent='FIRST RUN · Preparing the public EVE item catalog. '+
+  $('resourceCatalogStatus').textContent='QUICK START · '+all.length+
+   ' verified starter resource types available while the full ESI index loads. '+
    (lastCatalogProgress||'Contacting ESI…')+
-   ' · The empty list does not mean there are no matching ores.';
+   ' · Prices are still fetched from ESI. More resource types will appear when indexing finishes.';
  }else{
   $('resourceCatalogStatus').textContent=(global.ICAndroid?'Tap a resource to add/remove it · ':'Ctrl-click to select multiple · ')+
    inCategory+'/'+MAX_SELECTED+' selected · '+found.length+' matches in '+all.length+
@@ -157,14 +176,16 @@ function init(currentMode='both'){
  global.addEventListener('ic-market-catalog-progress',event=>{
   lastCatalogProgress=String(event.detail||'');
   if(!market().catalogState().count)
-   $('resourceCatalogStatus').textContent='BUILDING RESOURCE CATALOG · '+lastCatalogProgress;
+   $('resourceCatalogStatus').textContent='QUICK START AVAILABLE · '+lastCatalogProgress;
  });
  seedDefaultSelection();render();
 }
 async function loadResources(resource,force=false){
  const M=market();
- if(!M.catalogState().count)await M.loadCatalog();
- const candidates=M.resourceItems(resource);
+ if(!M.catalogState().count&&!browseItems(resource).some(x=>selected.has(x.id))){
+  await M.loadCatalog();
+ }
+ const candidates=browseItems(resource);
  const chosen=candidates.filter(x=>selected.has(x.id));
  if(!chosen.length)throw Error('Select 1–12 variants in the ESI RESOURCE CATALOG first, then SCAN MARKETS. Use SELECT MATCHING to pick from all known types.');
  if(chosen.length>MAX_SELECTED)throw Error('Too many selected resources. Limit scanning to 12 variants so public ESI orders are not flooded.');
