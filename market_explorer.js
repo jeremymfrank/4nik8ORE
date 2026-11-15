@@ -8,7 +8,11 @@ const KNOWN={'10000002':'The Forge · Jita','10000043':'Domain · Amarr','100000
 let catalog=[],catalogFetched=0,catalogComplete=false,catalogErrors=0,catalogPromise=null;
 let scanCount=0,regionCache=null;
 const mem=new Map();
-function notice(id,s){const el=$(id);if(el)el.textContent=s;}
+function notice(id,s){
+ const el=$(id);if(el)el.textContent=s;
+ if(id==='marketCatalogSummary'&&typeof global.CustomEvent==='function')
+  global.dispatchEvent(new global.CustomEvent('ic-market-catalog-progress',{detail:String(s)}));
+}
 function cache(key,ttl){
  const entry=mem.get(key);return entry&&Date.now()-entry.time<ttl?entry.data:null;
 }
