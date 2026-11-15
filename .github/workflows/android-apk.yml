@@ -33,11 +33,24 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Use Android SDK preinstalled on Ubuntu runner
+      - name: Locate Android SDK command-line manager and install platform 35
+        shell: bash
         run: |
+          set -euo pipefail
           echo "Android SDK: $ANDROID_HOME"
-          command -v sdkmanager
-          sdkmanager --install 'platforms;android-35' 'build-tools;35.0.0'
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" "$ANDROID_HOME/tools" -type f -name sdkmanager 2>/dev/null | head -n1 || true)"
+          if [ -z "$SDKMANAGER" ]; then
+            echo "Android SDK command-line manager missing; installing from Google"
+            curl -fL --retry 3 -o "$RUNNER_TEMP/commandlinetools.zip"               'https://dl.google.com/android/repository/commandlinetools-linux-12266719_latest.zip'
+            mkdir -p "$RUNNER_TEMP/android-tools" "$ANDROID_HOME/cmdline-tools/latest"
+            unzip -q "$RUNNER_TEMP/commandlinetools.zip" -d "$RUNNER_TEMP/android-tools"
+            cp -r "$RUNNER_TEMP/android-tools/cmdline-tools/." "$ANDROID_HOME/cmdline-tools/latest/"
+            SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          fi
+          echo "Using $SDKMANAGER"
+          chmod +x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" --install 'platforms;android-35' 'build-tools;35.0.0'
 
       - name: Install Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
