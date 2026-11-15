@@ -65,3 +65,41 @@ body.android-app .bottom{display:none!important}
  body.android-app .field-row,body.android-app .ship-catalog-search,body.android-app .market-explorer-fields{grid-template-columns:repeat(2,minmax(0,1fr))!important}
  #androidTabBar{max-width:760px;left:50%;transform:translateX(-50%);border-left:1px solid #69532d;border-right:1px solid #69532d;border-radius:10px 10px 0 0}
 }
+
+
+/* Android v0.6.2 scroll repair.
+   The former native multiple-select intercepted vertical touch swipes. Use one
+   clearly scrollable app viewport and ordinary clickable resources instead. */
+html:has(body.android-app){height:100%;min-height:0;overflow:hidden}
+body.android-app{height:100%;min-height:0;overflow:hidden;overscroll-behavior:contain}
+body.android-app .frame{
+  height:100%;max-height:100%;min-height:0;
+  overflow-x:hidden;overflow-y:auto!important;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior-y:contain;
+  touch-action:pan-y;
+  padding-bottom:calc(116px + env(safe-area-inset-bottom, 0px));
+}
+body.android-app .frame main{overflow:visible!important;height:auto!important;max-height:none!important}
+body.android-app .frame main>section{overflow-wrap:anywhere}
+#androidResourceChoices{display:none}
+body.android-app #resourcePick{display:none!important}
+body.android-app #androidResourceChoices{display:block;max-height:none;overflow:visible;min-width:0}
+body.android-app .android-resource-picked-heading{color:var(--amber);font-size:11px;font-weight:850;letter-spacing:.4px;margin:13px 0 9px}
+body.android-app .android-resource-picked{display:flex;gap:7px;flex-wrap:wrap;min-height:20px}
+body.android-app .android-resource-picked>p,body.android-app .android-resource-help{color:var(--muted);font-size:12px;line-height:1.55;margin:5px 0 10px}
+body.android-app .android-resource-matches{display:grid;grid-template-columns:1fr;gap:7px;max-height:none!important;overflow:visible!important}
+body.android-app .android-resource-choice,body.android-app .android-resource-chip{
+  display:block;box-sizing:border-box;white-space:normal;overflow-wrap:anywhere;
+  border:1px solid var(--edge2);border-radius:6px;
+  background:#182325;color:#e9e1cf;
+  min-height:47px;text-align:left;padding:11px 13px;font-size:13px!important;
+  line-height:1.45;font-weight:700;touch-action:manipulation;
+}
+body.android-app .android-resource-choice.selected{background:#3a3020;border-color:#dfa244;color:#ffe6aa}
+body.android-app .android-resource-chip{flex:0 1 auto;min-height:37px;padding:8px 11px;background:#3d3225;color:#f7dc9e;border-color:#a87438;font-size:11px!important}
+body.android-app .android-resource-choice:focus-visible,body.android-app .android-resource-chip:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+body.android-app #androidTabBar{touch-action:manipulation}
+@media(min-width:680px){
+  body.android-app .android-resource-matches{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
