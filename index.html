@@ -31,6 +31,7 @@
             <div class="resource-picker-heading">EVE RESOURCE CATALOG · ALL TYPES FROM ESI</div>
             <label class="field"><span>FIND ORE, MOON ORE, ICE OR GAS (NAME / VARIANT)</span><input type="search" id="resourceFilter" placeholder="e.g. Mercoxit, Glare Crust, Cobaltite" autocomplete="off"></label>
             <select id="resourcePick" multiple size="5" aria-label="Resource types to price. Hold Ctrl to select multiple"><option value="">Load the full ESI market catalog to select mineable resources</option></select>
+            <div id="androidResourceChoices" class="android-resource-choices" aria-label="Tap resources to include in next scan" role="group"></div>
             <div class="resource-picker-buttons"><button type="button" id="resourcePickMatches">SELECT MATCHING (MAX 12)</button><button type="button" id="resourcePickClear">CLEAR SELECTION</button></div>
             <details class="resource-maintenance"><summary>RESOURCE CATALOG MAINTENANCE</summary><button type="button" id="resourceCatalogLoad">RELOAD RESOURCE TYPES FROM ESI</button></details>
             <div id="resourceCatalogStatus" class="resource-catalog-status" role="status">Select up to 12 resource variants per price scan. The full market item catalog is shared with the Market Explorer below.</div>
