@@ -97,6 +97,12 @@ function catalogCsv(){
 }
 function exportShipCatalog(){
  if(!shipCatalog.length)return;
+ if(window.ICAndroid){
+  window.ICAndroid.exportFile('4nik8-eve-ship-catalog-'+new Date().toISOString().slice(0,10)+'.csv',catalogCsv(),'text/csv')
+   .then(()=>catalogStatus('Ship list exported to Android Files'))
+   .catch(e=>catalogStatus('Export not saved · '+e.message));
+  return;
+ }
  const blob=new Blob([catalogCsv()],{type:'text/csv;charset=utf-8'});
  const address=URL.createObjectURL(blob),a=document.createElement('a');
  a.href=address;a.download='4nik8-eve-ship-catalog-'+new Date().toISOString().slice(0,10)+'.csv';
@@ -642,7 +648,7 @@ function drawRows(){
   const metricUnit=$('miningSort').value==='hour'?(performance?'ISK/hour · all-in est.':'Yield / route unknown'):(oreNet?'ISK/m³ · est. net':'ISK/m³ · gross (unrouted)');
   return `<div class="op-card ${state.selected===item.name?'selected':''}" data-item="${L.escape(item.name)}" role="button" tabindex="0" aria-label="Inspect ${L.escape(item.name)}"><div class="rank">${ranking}</div><div class="op-main"><div class="op-name">${L.escape(item.name)}</div><div class="op-sub">${mark} · ${L.escape(MARKETS[w.region]||state.system.regionName||'Other region')}${full?' · FULL LOAD':' · PARTIAL '+Math.round(w.quote.coverage*100)+'%'}</div></div><div class="op-price"><strong class="${full?'':'limited'}">${metricValue}</strong><small>${metricUnit}</small></div></div>`;
  }).join('');
- el.querySelectorAll('[data-item]').forEach(node=>{const callback=()=>selectItem(node.dataset.item);node.addEventListener('click',callback);node.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();callback();}});});
+ el.querySelectorAll('[data-item]').forEach(node=>{const callback=()=>{selectItem(node.dataset.item);window.ICAndroidUI?.openTab('freight',true);};node.addEventListener('click',callback);node.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();callback();}});});
  const hourly=$('miningSort').value==='hour';
  const leader=hourly?displayed.find(x=>bestHourlyBuyer(x)):displayed.find(x=>x.winner);
  const lw=leader?effectiveBuyer(leader):null;
@@ -1424,6 +1430,11 @@ const settingsManager=(()=>{
   // Capture at execution time to avoid a queued stale write reverting newer settings.
   queue=queue.catch(()=>{}).then(async()=>{
    try{
+    if(window.ICAndroid){
+     await window.ICAndroid.saveSettings(capture());
+     notify('ANDROID SETTINGS SAVED ON DEVICE · '+new Date().toLocaleTimeString());
+     return;
+    }
     const res=await fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(capture())});
     if(!res.ok){
      let detail='';try{const error=await res.json();detail=String(error.error||error.message||'').slice(0,170);}catch(_){}
@@ -1437,10 +1448,14 @@ const settingsManager=(()=>{
  async function load(){
   const browser=capture();
   try{
-   const ctrl=new AbortController();const t=setTimeout(()=>ctrl.abort(),2200);
-   let response;try{response=await fetch('/api/settings',{signal:ctrl.signal,cache:'no-store'});}finally{clearTimeout(t);}
-   if(!response.ok)throw Error('HTTP '+response.status);
-   const disk=await response.json();
+   let disk;
+   if(window.ICAndroid)disk=await window.ICAndroid.loadSettings();
+   else {
+    const ctrl=new AbortController(),t=setTimeout(()=>ctrl.abort(),2200);
+    let response;try{response=await fetch('/api/settings',{signal:ctrl.signal,cache:'no-store'});}finally{clearTimeout(t);}
+    if(!response.ok)throw Error('HTTP '+response.status);
+    disk=await response.json();
+   }
    if(disk&&disk.schemaVersion===1){
     // Restore durable snapshot; merge any presets that were created in old v0.2
     // browser storage but not yet migrated to AppData.
@@ -1448,19 +1463,26 @@ const settingsManager=(()=>{
     const additions=(browser.radio.channels||[]).filter(c=>c?.playlistId&&!ids.has(c.playlistId));
     const merged=structuredClone(disk);
     if(additions.length)merged.radio.channels=[...merged.radio.channels,...additions].slice(0,40);
-    apply(merged);notify('WINDOWS SETTINGS RESTORED');
+    apply(merged);notify(window.ICAndroid?'ANDROID SETTINGS RESTORED':'WINDOWS SETTINGS RESTORED');
     }else {
       if(!browser.radio.channels.length)browser.radio.channels=[{...FACTORY_JUPILUXE}];
-      apply(browser);notify('BROWSER CHANNELS MIGRATED TO WINDOWS');
+      apply(browser);notify(window.ICAndroid?'NEW ANDROID PROFILE CREATED':'BROWSER CHANNELS MIGRATED TO WINDOWS');
     }
   }catch(_){
     if(!browser.radio.channels.length){browser.radio.channels=[{...FACTORY_JUPILUXE}];apply(browser);}
-    notify('BROWSER SETTINGS ONLY · WINDOWS HOST UNAVAILABLE');
+    notify(window.ICAndroid?'ANDROID SETTINGS UNAVAILABLE · RETRY SAVE':'BROWSER SETTINGS ONLY · WINDOWS HOST UNAVAILABLE');
   }
   started=true;await save();
  }
  function download(){
-  const json=JSON.stringify(capture(),null,2), blob=new Blob([json],{type:'application/json'}),u=URL.createObjectURL(blob);
+  const json=JSON.stringify(capture(),null,2);
+  if(window.ICAndroid){
+   window.ICAndroid.exportFile('4nik8-industrial-command-settings.json',json,'application/json')
+    .then(()=>notify('SETTINGS EXPORTED TO ANDROID FILES'))
+    .catch(e=>notify('EXPORT NOT SAVED · '+e.message));
+   return;
+  }
+  const blob=new Blob([json],{type:'application/json'}),u=URL.createObjectURL(blob);
   const a=document.createElement('a');a.href=u;a.download='4nik8-industrial-command-settings.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1200);
  }
  async function importFile(file){
