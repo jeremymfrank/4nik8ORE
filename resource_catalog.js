@@ -3,7 +3,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const KEY='4nik8.resource.selection.v1', MAX_SELECTED=12;
-let selected=new Set(),mode='both',firstLaunch=false;
+let selected=new Set(),mode='both',firstLaunch=false,lastCatalogProgress='';
 function market(){return global.ICMarketExplorer;}
 function family(item){return market().familyOf(item);}
 function filtered(){
@@ -64,7 +64,7 @@ function touchResourcePicker(visible){
  if(!catalog.length){
   const hint=document.createElement('p');
   hint.className='android-resource-help';
-  hint.textContent='Loading the EVE resource catalog. Internet access is needed for the first sync.';
+  hint.textContent='Preparing the EVE resource catalog… On the first launch this can take a while. Keep the app open; matching ores will appear automatically when the index is ready.';
   host.appendChild(hint);
  }else if(!visible.length){
   const hint=document.createElement('p');
@@ -96,10 +96,15 @@ function render(){
  }
  touchResourcePicker(found);
  const inCategory=all.filter(x=>selected.has(x.id)).length;
- $('resourceCatalogStatus').textContent=market().catalogState().count.toLocaleString()+
-  ' EVE market item IDs indexed · '+all.length+' resources in selected class · '+
-  inCategory+' selected in this class · '+found.length+' matches'+(found.length>200?' (first 200 shown; refine search)':'')+
-  ' · Filter results are not scanned automatically; click SCAN MARKETS after changing selection.';
+ if(!market().catalogState().count){
+  $('resourceCatalogStatus').textContent='FIRST RUN · Preparing the public EVE item catalog. '+
+   (lastCatalogProgress||'Contacting ESI…')+
+   ' · The empty list does not mean there are no matching ores.';
+ }else{
+  $('resourceCatalogStatus').textContent=(global.ICAndroid?'Tap a resource to add/remove it · ':'Ctrl-click to select multiple · ')+
+   inCategory+'/'+MAX_SELECTED+' selected · '+found.length+' matches in '+all.length+
+   ' mineable types. Tap SCAN MARKETS to refresh quotations.';
+ }
 }
 function seedDefaultSelection(){
  if(!firstLaunch||!market().catalogState().complete)return;
@@ -149,6 +154,11 @@ function init(currentMode='both'){
  });
  $('resourcePickClear').addEventListener('click',()=>{selected.clear();save();render();});
  global.addEventListener('ic-market-catalog-updated',onCatalogLoaded);
+ global.addEventListener('ic-market-catalog-progress',event=>{
+  lastCatalogProgress=String(event.detail||'');
+  if(!market().catalogState().count)
+   $('resourceCatalogStatus').textContent='BUILDING RESOURCE CATALOG · '+lastCatalogProgress;
+ });
  seedDefaultSelection();render();
 }
 async function loadResources(resource,force=false){
