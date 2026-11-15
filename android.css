@@ -77,7 +77,7 @@ body.android-app .frame{
   overflow-x:hidden;overflow-y:auto!important;
   -webkit-overflow-scrolling:touch;
   overscroll-behavior-y:contain;
-  touch-action:pan-y;
+  touch-action:auto;
   padding-bottom:calc(116px + env(safe-area-inset-bottom, 0px));
 }
 body.android-app .frame main{overflow:visible!important;height:auto!important;max-height:none!important}
@@ -103,3 +103,16 @@ body.android-app #androidTabBar{touch-action:manipulation}
 @media(min-width:680px){
   body.android-app .android-resource-matches{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+/* One vertical scroller for each Android tab—no trapped page swipes inside
+   trade cards, radio channel menus, order audit or destination lists. */
+body.android-app .trade-results,
+body.android-app .channel-list,
+body.android-app .playlist,
+body.android-app .freight-destinations,
+body.android-app #marketAuditTable{
+  max-height:none!important;
+  overflow-y:visible!important;
+  overscroll-behavior-y:auto!important;
+}
+body.android-app .market-explorer-table-scroll{max-height:none!important}
