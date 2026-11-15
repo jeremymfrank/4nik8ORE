@@ -64,7 +64,7 @@ const B=win.ICResourceBrowser;
  assert.equal(result.length,1);
  assert.equal(result[0].name,'Dark Ochre');
  assert.equal(result[0].volume,8);
- assert.equal(loadFullCalled,false,'Full index not required for the starter item's live ESI quote');
+ assert.equal(loadFullCalled,false,'Full index not required for the starter item live ESI quote');
  assert(el('resourceCatalogStatus').textContent.includes('QUICK START'));
  catalogReady=true;
  handlers.get('ic-market-catalog-updated')();
