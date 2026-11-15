@@ -15,6 +15,75 @@ function save(){
  if(typeof global.CustomEvent==='function')
   global.dispatchEvent(new global.CustomEvent('ic-resource-selection-changed'));
 }
+// The native <select multiple> consumes Android touch swipes. Keep it only
+// for desktop; Android gets ordinary tap buttons without a nested scroll box.
+function touchResourcePicker(visible){
+ const host=$('androidResourceChoices');
+ if(!host||!global.ICAndroid)return;
+ host.replaceChildren();
+ const catalog=market().resourceItems('both');
+ const byId=new Map(catalog.map(item=>[item.id,item]));
+ const chosen=[...selected].map(id=>byId.get(id)).filter(Boolean);
+ const header=document.createElement('div');
+ header.className='android-resource-picked-heading';
+ header.textContent='SELECTED FOR NEXT SCAN · '+chosen.length+'/'+MAX_SELECTED;
+ host.appendChild(header);
+ const picked=document.createElement('div');
+ picked.className='android-resource-picked';
+ if(!chosen.length){
+  const hint=document.createElement('p');
+  hint.textContent='Nothing selected. Tap resource names below to add them.';
+  picked.appendChild(hint);
+ }
+ function button(item,removeChip=false){
+  const node=document.createElement('button');
+  node.type='button';
+  const pickedNow=selected.has(item.id);
+  node.className=removeChip?'android-resource-chip':'android-resource-choice'+(pickedNow?' selected':'');
+  node.textContent=(removeChip?'× ':'')+(pickedNow&&!removeChip?'✓ ':'')+item.name+
+    (removeChip?'':' · '+family(item).toUpperCase());
+  node.setAttribute('aria-pressed',String(pickedNow));
+  node.setAttribute('aria-label',(removeChip?'Remove ':'Toggle ')+item.name);
+  node.addEventListener('click',()=>{
+   if(selected.has(item.id))selected.delete(item.id);
+   else if(selected.size>=MAX_SELECTED){
+    $('resourceCatalogStatus').textContent='Maximum '+MAX_SELECTED+' selected resources. Remove a resource above before adding another.';
+    return;
+   }else selected.add(item.id);
+   save();render();
+  });
+  return node;
+ }
+ for(const item of chosen)picked.appendChild(button(item,true));
+ host.appendChild(picked);
+ const matchesHeading=document.createElement('div');
+ matchesHeading.className='android-resource-picked-heading';
+ const term=$('resourceFilter').value.trim();
+ matchesHeading.textContent=term?'MATCHING RESOURCES · TAP TO SELECT':'BROWSE RESOURCES · TAP TO SELECT';
+ host.appendChild(matchesHeading);
+ if(!catalog.length){
+  const hint=document.createElement('p');
+  hint.className='android-resource-help';
+  hint.textContent='Loading the EVE resource catalog. Internet access is needed for the first sync.';
+  host.appendChild(hint);
+ }else if(!visible.length){
+  const hint=document.createElement('p');
+  hint.className='android-resource-help';
+  hint.textContent='No matching resources. Try another name or choose a different resource category above.';
+  host.appendChild(hint);
+ }else{
+  const list=document.createElement('div');
+  list.className='android-resource-matches';
+  // Do not create another scrollable list inside the Android WebView.
+  for(const item of visible.slice(0,16))list.appendChild(button(item));
+  host.appendChild(list);
+  if(visible.length>16){
+   const hint=document.createElement('p');hint.className='android-resource-help';
+   hint.textContent='Showing 16 of '+visible.length+' results. Type more of the name above to narrow the list.';
+   host.appendChild(hint);
+  }
+ }
+}
 function render(){
  const all=market().resourceItems(mode),found=filtered(),list=$('resourcePick');
  list.innerHTML='';
@@ -25,6 +94,7 @@ function render(){
   opt.selected=selected.has(item.id);
   list.appendChild(opt);
  }
+ touchResourcePicker(found);
  const inCategory=all.filter(x=>selected.has(x.id)).length;
  $('resourceCatalogStatus').textContent=market().catalogState().count.toLocaleString()+
   ' EVE market item IDs indexed · '+all.length+' resources in selected class · '+
