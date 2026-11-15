@@ -33,14 +33,22 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Android SDK
-        uses: android-actions/setup-android@v3
-      - name: Install required Android SDK components
-        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Use Android SDK preinstalled on Ubuntu runner
+        run: |
+          echo "Android SDK: $ANDROID_HOME"
+          command -v sdkmanager
+          sdkmanager --install 'platforms;android-35' 'build-tools;35.0.0'
+
       - name: Install Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: JavaScript and mobile integration tests
+        run: |
+          node tests/android_bridge.test.js
+          node tests/android_project.test.js
+          node tests/ship_catalog.test.js
+          node tests/market_accuracy.test.js
       - name: Build sideloadable APK
         working-directory: android
         run: gradle --no-daemon --stacktrace :app:assembleDebug
