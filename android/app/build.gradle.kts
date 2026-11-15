@@ -43,6 +43,7 @@ val bundleSharedWeb by tasks.registering(Copy::class) {
         include("resource_catalog.js")
         include("android_bridge.js")
         include("android.css")
+        include("assets/**")  // corporation emblem and other bundled UI images
     }
     into(layout.projectDirectory.dir("src/main/assets"))
 }
