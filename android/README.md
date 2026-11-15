@@ -1,4 +1,4 @@
-# 4NIK8 ORE Industrial Command — Android edition (v0.6.2)
+# 4NIK8 ORE Industrial Command — Android edition (v0.6.2.1)
 
 The Android app uses the SAME checked-in HTML, CSS, ESI market order logic, ship catalog, ship math and radio code as the Windows Industrial Command dashboard. It is packaged in a native Android WebViewAssetLoader, with a five-tab touch interface and private on-device settings.
 
@@ -44,3 +44,13 @@ CI builds using the GitHub workflow in `.github/workflows/android-apk.yml` and p
 * `AtomicFile` is used for private durable settings; the system `ACTION_CREATE_DOCUMENT` picker writes exports without storage permissions. Import uses WebChromeClient's file chooser.
 * `android_bridge.js` detects the Android origin; on Windows it is inert. `android.css` is loaded only by the Android shell. The Android home/back behavior returns to the Mine tab before exiting.
 * Debug and mock regression tests: `node tests/android_bridge.test.js`, `node tests/android_project.test.js`, `node tests/ship_catalog.test.js`, and `node tests/market_accuracy.test.js`. Physical Android installation, touch navigation, ESI access, audio playback and persistent settings require on-device tests after the first APK is built.
+
+## Android v0.6.2.1 device-feedback changes
+
+* Android 15+ system-bar insets are now applied to the native WebView host, so the clock and battery no longer cover the corporation banner. The bottom navigation remains inside the safe area.
+* The Mine tab's desktop multi-select control is hidden on Android and replaced by large touch-friendly resource choices and clearly removable selection chips.
+* The app viewport scrolls vertically as a whole, avoiding swipes trapped in nested resource, trade, market and radio lists.
+* On the first Android launch, **Dark Ochre**, Pyroxeres, Gneiss, Omber and Clear Icicle can be selected immediately from a small verified **Quick Start** set. Their prices and attributes are still retrieved live from ESI. The complete ESI-derived resource catalog continues synchronizing and replaces the limited starter browse list when ready. The app displays catalog progress rather than presenting an unexplained empty list.
+* Regression checks include `node tests/android_scroll.test.js` and `node tests/android_resources.test.js`.
+
+**Installing over an earlier GitHub Actions debug APK:** GitHub-hosted debug signing keys can differ between builds. If Android says the new APK cannot be installed over the existing version, first export settings through the Android app's JSON backup function, then uninstall the old APK and install the replacement. Uninstalling without exporting can erase locally saved preferences.
