@@ -64,6 +64,7 @@ jobs:
         run: |
           node tests/android_bridge.test.js
           node tests/android_project.test.js
+          node tests/android_scroll.test.js
           node tests/ship_catalog.test.js
           node tests/market_accuracy.test.js
       - name: Build sideloadable APK
