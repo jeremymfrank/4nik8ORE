@@ -1,0 +1,67 @@
+/* 4NIK8 ORE Industrial Command • Android touch layout (only loaded in app shell) */
+:root{color-scheme:dark}
+html{overflow-x:hidden;-webkit-text-size-adjust:100%;scrollbar-gutter:stable}
+body.android-app{margin:0;min-width:0;overflow-x:hidden;overscroll-behavior-y:contain}
+body.android-app .frame{max-width:100%;width:100%;margin:0 auto;padding:8px 10px calc(96px + env(safe-area-inset-bottom, 0px));box-sizing:border-box}
+body.android-app header{margin:0 0 12px;padding:9px 10px;max-width:100%;min-width:0;flex-wrap:wrap;gap:8px}
+body.android-app .masthead h1{font-size:clamp(17px,4.7vw,25px);line-height:1.18}
+body.android-app .masthead .eyebrow{font-size:9px}
+body.android-app .masthead .tagline{font-size:9px}
+body.android-app main{display:block!important;width:100%;min-width:0;max-width:100%}
+body.android-app main>section{grid-column:auto!important;width:100%!important;max-width:100%;min-width:0;box-sizing:border-box;margin:0 0 14px}
+body.android-app .android-hidden{display:none!important}
+body.android-app .panel{padding:12px!important;max-width:100%;min-width:0}
+body.android-app .section-name{font-size:12px;gap:6px;flex-wrap:wrap;line-height:1.4}
+body.android-app .section-name .small-label{font-size:9px}
+body.android-app .field>span,body.android-app .field label{font-size:11px;line-height:1.45}
+body.android-app .field>input,body.android-app .field>select,body.android-app .field>textarea,
+body.android-app select,body.android-app input:not([type=checkbox]):not([type=range]),
+body.android-app textarea{min-height:44px;font-size:16px!important;max-width:100%;min-width:0;border-radius:5px}
+body.android-app textarea{min-height:70px}
+body.android-app button{min-height:43px;touch-action:manipulation}
+body.android-app button:disabled{opacity:.48}
+body.android-app a,body.android-app summary{touch-action:manipulation}
+body.android-app .field-row,body.android-app .config-row,body.android-app .freight-settings,body.android-app .market-explorer-fields,body.android-app .market-explorer-filters,body.android-app .mining-profile-grid,body.android-app .mining-input-grid,body.android-app .ship-catalog-search{
+ grid-template-columns:1fr!important;max-width:100%;min-width:0
+}
+body.android-app .field-row .field,body.android-app .config-row .field{width:100%;max-width:100%}
+body.android-app .segmented{display:flex;flex-wrap:wrap;gap:5px}
+body.android-app .segmented .segment{flex:1 1 100px;min-width:0;font-size:10px;padding:8px}
+body.android-app .resource-picker{padding:10px;margin:10px 0}
+body.android-app #resourcePick{min-height:124px;font-size:13px!important}
+body.android-app .op-card{min-height:60px;gap:7px;cursor:pointer}
+body.android-app .op-price strong{font-size:clamp(18px,5vw,23px)}
+body.android-app .opportunity-list{max-height:none}
+body.android-app .freight-destinations{max-height:none}
+body.android-app .freight-destination-top,body.android-app .freight-destination-bottom{gap:7px;flex-wrap:wrap}
+body.android-app .freight-destination-top{align-items:flex-start}
+body.android-app .freight-profit{font-size:15px}
+body.android-app .market-explorer-charts,body.android-app .market-explorer-kpis{grid-template-columns:1fr}
+body.android-app .market-bar-row{grid-template-columns:minmax(65px,1fr) minmax(45px,1fr) minmax(80px,1fr)}
+body.android-app .market-explorer-table-scroll{max-width:100%;overflow-x:auto}
+body.android-app .market-audit-filters{grid-template-columns:1fr}
+body.android-app .market-audit-filters button{grid-column:auto}
+body.android-app .ship-stat-cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+body.android-app .ship-editor-grid{grid-template-columns:1fr!important}
+body.android-app .ship-quick-heading{align-items:flex-start}
+body.android-app .trade-run-summary{grid-template-columns:1fr}
+body.android-app .trade-results{max-height:65vh}
+body.android-app .trade-run-summary .trade-run-price strong{font-size:15px}
+body.android-app .radio-header{flex-wrap:wrap}
+body.android-app .player-controls{flex-wrap:wrap;gap:8px}
+body.android-app .channel-rack .channel-form{grid-template-columns:1fr}
+body.android-app .bottom{display:none!important}
+#androidTabBar{position:fixed;bottom:0;left:0;right:0;z-index:9999;display:flex;align-items:stretch;justify-content:space-around;gap:2px;padding:7px 6px calc(6px + env(safe-area-inset-bottom, 0px));height:auto;min-height:73px;box-sizing:border-box;border-top:1px solid #69532d;background:linear-gradient(180deg,#171f21,#0e1416);box-shadow:0 -5px 22px #080a0dbb}
+#androidTabBar button.android-tab{font:inherit;display:flex;flex:1 1 0;min-width:0;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:6px 3px;border:1px solid transparent;background:transparent;color:#a7b5b0;border-radius:7px;cursor:pointer;min-height:57px}
+#androidTabBar button.android-tab .android-tab-icon{display:block;font-size:21px;line-height:23px;color:#b49a72}
+#androidTabBar button.android-tab .android-tab-label{display:block;font-weight:900;font-size:10px;letter-spacing:.25px;white-space:nowrap}
+#androidTabBar button.android-tab.active{background:#3d3021;border-color:#a86e31;color:#ffe6b7}
+#androidTabBar button.android-tab.active .android-tab-icon{color:#f4b04e}
+#androidTabBar button.android-tab:focus-visible{outline:2px solid #e9b66c}
+@media(min-width:680px){
+ body.android-app .frame{padding-left:20px;padding-right:20px}
+ body.android-app main{max-width:1150px;margin:0 auto}
+ body.android-app .ship-stat-cards{grid-template-columns:repeat(5,minmax(0,1fr))}
+ body.android-app .field-row,body.android-app .ship-catalog-search,body.android-app .market-explorer-fields{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ #androidTabBar{max-width:760px;left:50%;transform:translateX(-50%);border-left:1px solid #69532d;border-right:1px solid #69532d;border-radius:10px 10px 0 0}
+}
