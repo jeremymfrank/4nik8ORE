@@ -80,7 +80,12 @@ function mobileNavigation(){
    const on=button.dataset.tab===value;button.setAttribute('aria-pressed',String(on));
    button.classList.toggle('active',on);
   }
-  if(scroll)global.scrollTo({top:0,behavior:'instant'});
+  if(scroll){
+   // Android scrolls the app viewport, not the browser's root document.
+   const pane=global.document.querySelector('.frame');
+   if(pane)pane.scrollTop=0;
+   else global.scrollTo(0,0);
+  }
   try{global.sessionStorage.setItem('industrial.android.tab',value);}catch(_){}
   screen?.setAttribute('data-android-tab',value);
  }
