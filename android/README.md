@@ -6,7 +6,7 @@ The Android app uses the SAME checked-in HTML, CSS, ESI market order logic, ship
 
 1. Open the repository's **Actions** tab on GitHub.
 2. Select **Android Industrial Command APK**, then a successful run on `main`.
-3. Download the artifact named **IndustrialCommand-Android-v0.6.2-debug**.
+3. Download the artifact named **IndustrialCommand-Android-v0.6.2-scrollfix**.
 4. Extract `app-debug.apk` from the ZIP, transfer it to the Android device, and tap it to install. Android may require **Allow from this source** for the Files or browser application used to open the APK.
 5. Open **Industrial Command**. Use the bottom tabs: **Mine / Freight / Market / Ships / Radio**. The app automatically loads the public ship and market catalog when online. No Windows computer or local server is needed.
 
